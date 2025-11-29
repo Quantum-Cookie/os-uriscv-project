@@ -1,0 +1,9 @@
+# File compilati
+*.uriscv
+
+# Directory di build
+/build/
+
+# Configurazione vscode
+.vscode/
+
