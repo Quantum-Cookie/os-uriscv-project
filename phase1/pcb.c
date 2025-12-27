@@ -80,6 +80,19 @@ void insertChild(pcb_t* prnt, pcb_t* p) {
 }
 
 pcb_t* removeChild(pcb_t* p) {
+    /* Controlla che p abbia figli */
+    if (emptyChild(p))
+        return NULL;
+    
+    /* Elimina il figlio dalla lista */
+    struct list_head *toRemove = p->p_child.next;
+    list_del(toRemove);
+
+    /* Pulisce il campo padre del figlio rimosso */
+    pcb_t *childToRemove = container_of(toRemove, pcb_t, p_sib);
+    childToRemove->p_parent = NULL;
+
+    return childToRemove;
 }
 
 pcb_t* outChild(pcb_t* p) {
