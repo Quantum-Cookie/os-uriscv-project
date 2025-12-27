@@ -67,6 +67,8 @@ pcb_t* outProcQ(struct list_head* head, pcb_t* p) {
 }
 
 int emptyChild(pcb_t* p) {
+    /* Return controllando se struct list_head p_child sia vuota o meno */ 
+    return list_empty(&(p->p_child));
 }
 
 void insertChild(pcb_t* prnt, pcb_t* p) {
