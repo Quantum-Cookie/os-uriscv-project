@@ -72,6 +72,11 @@ int emptyChild(pcb_t* p) {
 }
 
 void insertChild(pcb_t* prnt, pcb_t* p) {
+    /* Aggiunge il processo figlio p in fondo alla lista dei figli di prnt */
+    list_add_tail(&(p->p_sib), &(prnt->p_child));
+
+    /* Aggiorna il padre di p */
+    p->p_parent = prnt;
 }
 
 pcb_t* removeChild(pcb_t* p) {
