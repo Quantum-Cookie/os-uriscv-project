@@ -20,6 +20,20 @@ int emptyProcQ(struct list_head* head) {
 }
 
 void insertProcQ(struct list_head* head, pcb_t* p) {
+    /* Puntatore al nodo davanti al quale verra' inserito p */
+    struct list_head *insertPos = head;
+
+    pcb_t *iter;
+
+    list_for_each_entry(iter, head, p_list) {
+        /* Se la priorita' di iter e' minore di quello di p, allora abbiamo trovato punto di inserimento */
+        if (iter->p_prio < p->p_prio) {
+            insertPos = &(iter->p_list);
+            break;
+        }
+    }
+
+    __list_add(&(p->p_list), insertPos->prev, insertPos);
 }
 
 pcb_t* headProcQ(struct list_head* head) {
