@@ -39,16 +39,24 @@ void insertProcQ(struct list_head* head, pcb_t* p) {
 pcb_t* headProcQ(struct list_head* head) {
 }
 
-pcb_t* removeProcQ(struct list_head* head) {
+/* Rimuove il primo elemento della lista puntato da head */
+static struct list_head *listRemoveFirst(struct list_head *head) {
     /* Controllo per vedere se la lista e' vuota o meno */ 
     if (list_empty(head))
         return NULL;
 
-    /* Rimozione del primo PCB (priorita' piu' alta) */
+    /* Rimuove primo elemento della lista */
     struct list_head *toRemove = head->next;
     list_del(toRemove);
 
-    return container_of(toRemove, pcb_t, p_list);
+    return toRemove;
+}
+
+pcb_t* removeProcQ(struct list_head* head) {
+    /* Rimuove il primo PCB dalla coda dei processi */
+    struct list_head *removed = listRemoveFirst(head);
+
+    return !removed ? NULL : container_of(removed, pcb_t, p_list);
 }
 
 pcb_t* outProcQ(struct list_head* head, pcb_t* p) {    
@@ -80,19 +88,18 @@ void insertChild(pcb_t* prnt, pcb_t* p) {
 }
 
 pcb_t* removeChild(pcb_t* p) {
-    /* Controlla che p abbia figli */
-    if (emptyChild(p))
+    /* Rimuove il primo figlio dalla lista dei figli di p */
+    struct list_head *removed = listRemoveFirst(&(p->p_child));
+
+    /* Controlla se ci sono figli rimossi */
+    if (!removed)
         return NULL;
-    
-    /* Elimina il figlio dalla lista */
-    struct list_head *toRemove = p->p_child.next;
-    list_del(toRemove);
 
     /* Pulisce il campo padre del figlio rimosso */
-    pcb_t *childToRemove = container_of(toRemove, pcb_t, p_sib);
-    childToRemove->p_parent = NULL;
+    pcb_t *pcbRemoved = container_of(removed, pcb_t, p_sib);
+    pcbRemoved->p_parent = NULL;
 
-    return childToRemove;
+    return pcbRemoved;
 }
 
 pcb_t* outChild(pcb_t* p) {
