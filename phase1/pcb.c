@@ -103,4 +103,13 @@ pcb_t* removeChild(pcb_t* p) {
 }
 
 pcb_t* outChild(pcb_t* p) {
+    /* Controlla se p ha un PCB padre */
+    if (!(p->p_parent))
+        return NULL;
+
+    /* Toglie p dai figli del PCB padre */
+    list_del(&(p->p_sib));
+    p->p_parent = NULL;
+
+    return p;
 }
