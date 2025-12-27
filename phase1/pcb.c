@@ -51,7 +51,19 @@ pcb_t* removeProcQ(struct list_head* head) {
     return container_of(toRemove, pcb_t, p_list);
 }
 
-pcb_t* outProcQ(struct list_head* head, pcb_t* p) {
+pcb_t* outProcQ(struct list_head* head, pcb_t* p) {    
+    pcb_t *iter;
+
+    list_for_each_entry(iter, head, p_list) {
+        /* Se p e' stato trovato nella lista lo rimuove e lo restituisce */ 
+        if (iter == p) {
+            list_del(&(iter->p_list));
+            return iter;
+        }
+    }
+
+    /* Se p non e' stato trovato restituisce NULL */ 
+    return NULL;
 }
 
 int emptyChild(pcb_t* p) {
