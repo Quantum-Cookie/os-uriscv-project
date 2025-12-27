@@ -40,6 +40,15 @@ pcb_t* headProcQ(struct list_head* head) {
 }
 
 pcb_t* removeProcQ(struct list_head* head) {
+    /* Controllo per vedere se la lista e' vuota o meno */ 
+    if (list_empty(head))
+        return NULL;
+
+    /* Rimozione del primo PCB (priorita' piu' alta) */
+    struct list_head *toRemove = head->next;
+    list_del(toRemove);
+
+    return container_of(toRemove, pcb_t, p_list);
 }
 
 pcb_t* outProcQ(struct list_head* head, pcb_t* p) {
