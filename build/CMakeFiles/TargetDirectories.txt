@@ -1,0 +1,4 @@
+/home/Orange/Documents/Sistemi operativi/os-uriscv-project-phase-1/build/CMakeFiles/MultiPandOS.dir
+/home/Orange/Documents/Sistemi operativi/os-uriscv-project-phase-1/build/CMakeFiles/MultiPandOSuRISCV.dir
+/home/Orange/Documents/Sistemi operativi/os-uriscv-project-phase-1/build/CMakeFiles/edit_cache.dir
+/home/Orange/Documents/Sistemi operativi/os-uriscv-project-phase-1/build/CMakeFiles/rebuild_cache.dir
