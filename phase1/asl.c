@@ -1,4 +1,5 @@
 #include "./headers/asl.h"
+#include "./headers/pcb.h"
 
 static semd_t semd_table[MAXPROC];
 static struct list_head semdFree_h;
@@ -8,6 +9,9 @@ void initASL()
 {
     // inizializzazione della lista dei semafori liberi
     INIT_LIST_HEAD(&semdFree_h);
+
+    // inizializzazione della lista dei semafori attivi
+    INIT_LIST_HEAD(&semd_h);
 
     // addizione di tutti i semafori alla lista vuota
     for (int i = 0; i < MAXPROC; i++)
@@ -31,9 +35,6 @@ int insertBlocked(int *semAdd, pcb_t *p)
             p->p_semAdd = semAdd;
             return 0;
         }
-        // interruzione dell'iterazione se si supera il semaforo cercato
-        if (temp->s_key > semAdd)
-            break;
     }
 
     // semaforo non trovato, nessun semaforo disponibile
@@ -57,7 +58,7 @@ int insertBlocked(int *semAdd, pcb_t *p)
     p->p_semAdd = semAdd;
 
     // inserzione del nuovo semaforo nella ASL
-    list_add(&newSem->s_link, current);
+    list_add_tail(&newSem->s_link, &semd_h);
 
     return 0;
 }
@@ -75,12 +76,6 @@ pcb_t *removeBlocked(int *semAdd)
         if (temp->s_key == semAdd)
         {
 
-            // controllo se la coda dei processi è vuota
-            if (list_empty(&temp->s_procq))
-            {
-                return NULL;
-            }
-
             struct list_head *firstPcbL = temp->s_procq.next;
             pcb_t *p = container_of(firstPcbL, pcb_t, p_list);
 
@@ -89,21 +84,17 @@ pcb_t *removeBlocked(int *semAdd)
             p->p_semAdd = NULL;
 
             // caso lista vuota dopo la rimozione
-            if (list_empty(&temp->s_procq))
+            if (emptyProcQ(&temp->s_procq))
             {
                 // rimozione del semaforo da ASL
                 list_del(&temp->s_link);
 
                 // ricollocamento del semaforo nella lista dei semafori liberi
-                list_add(&temp->s_link, &semdFree_h);
+                list_add_tail(&temp->s_link, &semdFree_h);
             }
 
             return p;
         }
-
-        // interruzione dell'iterazione se si supera il semaforo cercato
-        if (temp->s_key > semAdd)
-            break;
     }
 
     return NULL;
@@ -151,7 +142,7 @@ pcb_t *headBlocked(int *semAdd)
     list_for_each(current, &semd_h)
     {
         semd_t *temp = container_of(current, semd_t, s_link);
-        
+
         // trovato il semaforo cercato
         if (temp->s_key == semAdd)
         {
@@ -163,10 +154,6 @@ pcb_t *headBlocked(int *semAdd)
             struct list_head *headPcbL = temp->s_procq.next;
             return container_of(headPcbL, pcb_t, p_list);
         }
-
-        // interruzione dell'iterazione se si supera il semaforo cercato
-        if (temp->s_key > semAdd)
-            break;
     }
 
     return NULL;
