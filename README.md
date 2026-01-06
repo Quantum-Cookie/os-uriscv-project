@@ -3,9 +3,9 @@
 ## Description
 PandOSsh è un progetto educativo pensato per comprendere il funzionamento reale di un sistema operativo.  
 
-- Fase 1: Implementazione delle strutture dati fondamentali che rappresentano entità dai livelli superiori:
-    - **PCB (Process Control Block):** rappresentano i processi.
-    - **ASL (Active Semaphore List):** gestisce i semafori e i relativi processi bloccati.
+- Fase 1: Implementazione delle strutture dati fondamentali che rappresentano entità dai livelli superiori e funzioni di gestione:
+    - **PCB (Process Control Block):** Rappresentano i processi. Viene gestito l'allocazione, manipolazione code e alberi di processi.
+    - **ASL (Active Semaphore List):** Gestisce lista semafori e i relativi processi bloccati.
 
 ## Requirements
 - **CMake** >= 3.25
@@ -35,3 +35,6 @@ In alternativa è possibile avviare l'emulatore con già la configurazione caric
 ```bash
 uriscv config_machine.json
 ```
+
+## Testing
+Attualmente il progetto è configurato per essere compilato insieme al file di test. Quindi una volta avviata la macchina e fatta partire l'esecuzione, sul terminale dalla quale è stata avviata si dovrebbe lo stato dei controlli delle varie funzioni implementate.
