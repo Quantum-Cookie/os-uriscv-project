@@ -129,3 +129,52 @@ Nell'ambito degli alberi emerge chiaramente il vantaggio di utilizzare una lista
 
 ### Possibile utilizzo del Process Tree
 Un esempio dell'utilizzo del Process Tree può essere la terminazione a cascata. Generalmente quando un processo padre viene terminato, il kernel deve identificare e far terminare anche tutti i suoi figli. 
+
+
+## Struttura `semd_t` (Semaphore Descriptor)
+
+Il *semaphore descriptor* rappresenta un semaforo all’interno della **Active Semaphore List (ASL)**.
+
+- **`s_key`**  
+  Puntatore alla variabile intera che identifica univocamente il semaforo.
+
+- **`s_procq`**  
+  Lista dei PCB dei processi attualmente bloccati sul semaforo.
+
+- **`s_link`**  
+  Campo di collegamento utilizzato per inserire il descrittore nella lista dei semafori attivi (`semd_h`) o nella lista dei semafori liberi (`semdFree_h`).
+
+---
+
+## Funzioni ASL
+
+### `void initASL(void)`
+Inizializza la Active Semaphore List.  
+Imposta a vuote la lista dei semafori attivi e la lista dei semafori liberi, inserendo tutti i semaphore descriptor disponibili nella lista dei semafori liberi.
+
+---
+
+### `int insertBlocked(int *semAdd, pcb_t *p)`
+Inserisce il processo `p` nella coda dei processi bloccati sul semaforo identificato da `semAdd`.  
+Se il semaforo non è presente nella ASL, viene allocato un nuovo semaphore descriptor dalla lista dei semafori liberi.  
+Restituisce `0` in caso di successo, `1` se non sono disponibili semaphore descriptor liberi.
+
+---
+
+### `pcb_t *removeBlocked(int *semAdd)`
+Rimuove e restituisce il primo processo bloccato sul semaforo `semAdd`.  
+Se la coda del semaforo diventa vuota, il relativo semaphore descriptor viene rimosso dalla ASL e reinserito nella lista dei semafori liberi.  
+Restituisce `NULL` se il semaforo non è attivo.
+
+---
+
+### `pcb_t *outBlocked(pcb_t *p)`
+Rimuove il processo `p` dalla coda del semaforo su cui è bloccato.  
+Se, dopo la rimozione, la coda del semaforo è vuota, il semaphore descriptor viene restituito alla lista dei semafori liberi.  
+Restituisce il processo rimosso oppure `NULL` se il processo non era bloccato su un semaforo attivo.
+
+---
+
+### `pcb_t *headBlocked(int *semAdd)`
+Restituisce il primo processo bloccato sul semaforo `semAdd` senza rimuoverlo dalla coda.  
+Restituisce `NULL` se il semaforo non è presente nella ASL o se non ci sono processi bloccati.
