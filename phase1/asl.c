@@ -5,6 +5,12 @@ static semd_t semd_table[MAXPROC];
 static struct list_head semdFree_h;
 static struct list_head semd_h;
 
+/**
+ * @brief Inizializza la Active Semaphore List (ASL) e la lista dei semafori liberi.
+ * 
+ * @return * void : nessun valore di ritorno
+ */
+
 void initASL()
 {
     // inizializzazione della lista dei semafori liberi
@@ -19,6 +25,14 @@ void initASL()
         list_add(&semd_table[i].s_link, &semdFree_h);
     }
 }
+
+/**
+ * @brief Inserisce un PCB nella coda del semaforo specificato.
+ * 
+ * @param semAdd indirizzo del semaforo nel quale inserire il PCB
+ * @param p PCB da inserire nella coda del semaforo
+ * @return * int : 0 se l'inserimento è avvenuto con successo, 1 se non ci sono semafori disponibili
+ */
 
 int insertBlocked(int *semAdd, pcb_t *p)
 {
@@ -63,6 +77,13 @@ int insertBlocked(int *semAdd, pcb_t *p)
     return 0;
 }
 
+/**
+ * @brief rimuove e restituisce il primo PCB dalla coda del semaforo specificato.
+ * 
+ * @param semAdd indirizzo del semaforo dal quale rimuovere il PCB
+ * @return * pcb_t* : puntatore al PCB rimosso, NULL se il semaforo non esiste o la coda è vuota
+ */
+
 pcb_t *removeBlocked(int *semAdd)
 {
     struct list_head *current;
@@ -100,6 +121,13 @@ pcb_t *removeBlocked(int *semAdd)
     return NULL;
 }
 
+/**
+ * @brief rimuove un PCB specifico dalla coda del semaforo al quale è bloccato.
+ * 
+ * @param p PCB da rimuovere dalla coda del semaforo
+ * @return * pcb_t* : puntatore al PCB rimosso, NULL se il PCB non è stato trovato
+ */
+
 pcb_t *outBlocked(pcb_t *p)
 {
     struct list_head *current;
@@ -133,6 +161,13 @@ pcb_t *outBlocked(pcb_t *p)
 
     return NULL;
 }
+
+/**
+ * @brief restituisce il primo PCB dalla coda del semaforo specificato.
+ * 
+ * @param semAdd indirizzo del semaforo da cui ottenere il PCB
+ * @return * pcb_t* : puntatore al PCB in testa alla coda, NULL se il semaforo non esiste o la coda è vuota
+ */
 
 pcb_t *headBlocked(int *semAdd)
 {
