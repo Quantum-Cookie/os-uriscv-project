@@ -9,18 +9,58 @@
 #include "../../headers/types.h"
 
 // Initialize "pcbFree_h" and add elements of "pcbFree_table" to the list "pcbFree_h"
+/**
+ * @brief Inizializza la lista dei PCB liberi e popola la lista pcbFree_h
+ * con tutti i PCB presenti nell'array pcbFree_table.
+ * Ogni PCB viene inizializzato e inserito nella lista dei PCB liberi.
+ * 
+ */
+
 void initPcbs();
 
 // Add PCB "p" to the list "pcbFree_h"
+/** 
+ * @brief Inserisce il PCB puntato da p nella lista dei PCB liberi. 
+ * 
+ * @param p Puntatore al PCB da liberare
+ * 
+ * @return void 
+ * 
+*/
+
 void freePcb(pcb_t* p);
 
 // Allocate new PCB removing one from list "pcbFree_h" if possible
+/** 
+ * @brief Estrae un PCB dalla lista dei PCB liberi, lo inizializza e lo restituisce.
+ * Se la lista dei PCB liberi è vuota, restituisce NULL.
+ * 
+ * @return pcb_t* Puntatore al PCB allocato o NULL se non ci sono PCB liberi
+ * 
+ */
+
 pcb_t* allocPcb();
 
 // Create an empty PCB list
+/**
+ * @brief Crea una lista vuota di PCB.
+ * 
+ * @param head Puntatore alla testa della lista di PCB da inizializzare
+ * 
+ */
+
 void mkEmptyProcQ(struct list_head* head);
 
 // Check if the PCB list "head" is empty
+/**
+ * @brief Controlla se la lista dei PCB puntata da head è vuota.
+ * 
+ * @param head Puntatore alla testa della lista di PCB da controllare
+ * 
+ * @return int Restituisce 1 se la lista è vuota, 0 altrimenti
+ * 
+ */
+
 int emptyProcQ(struct list_head* head);
 
 // Insert PCB "p" in the list "head"
