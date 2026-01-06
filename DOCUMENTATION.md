@@ -22,7 +22,7 @@ struct list_head {
 
 Naturalmente, essendo la testa di una lista doppiamente circolare, il suo puntatore `prev` punta all'ultimo elemento, e `next` punta al primo elemento.
 
-1. Con tale elemento è possibile evitare il controllo sul fatto se l'elemento testa passato alla varie funzioni sia equivalente a `NULL` o meno, ma controllando semplicemente con
+1. Con tale elemento è possibile evitare il controllo sul fatto se l'elemento testa passato alle varie funzioni sia equivalente a `NULL` o meno, ma controllando semplicemente con
 ```c
     if (head->next == head)
 ```
@@ -30,6 +30,13 @@ Naturalmente, essendo la testa di una lista doppiamente circolare, il suo puntat
 2. Permette di poter inserire un elemento sia in testa che in coda senza la necessità di effettuare ulteriori controlli, in quanto si è sicuri che l'elemento head sia sempre diverso da `NULL`. 
 
 3. Permette di rimuovere gli elementi dalla lista puntata da esso senza la necessità di controllare che esso non risulti essere l'unico rimasto e quindi toglie la necessità di aggiornare il valore di `head` (naturalmente i suoi campi `prev` e `next` comunque devono essere aggiornati per essere coerenti con lo stato reale), fornendo punto di accesso fisso alla lista.
+
+## NOTA IMPORTANTE E FILOSOFIA DI PROGETTAZIONE
+Nelle funzioni implementate non sono state aggiunte degli controlli sull'effettiva validità dei puntatori (es. `if (head == NULL)`) passati come argomento alle funzioni. La scelta scegue la filosofia `fail-fast`. Si riporta in seguito motivazioni e ragionamenti:
+
+- **Efficienza:** Essendo un implementazione al livello 2 (Queue Manager), sulla quale si basa tutto, formando il nucleo del sistema. Evitando controlli si massimizza le prestazioni a livello globale.
+- **Debugging:** Il passaggio di un puntatore nullo a questo livello è considerato un errore logico del chiamante. Gestirlo silenziosamente potrebbe provocare errori altrove rendendo più difficile il debug. 
+- **Strategia di sviluppo:** Durante la fase di sviluppo è possibile gestire tale errore e affinare con un log ad esempio nel `klog_buffer`, ed entrare in un loop infinito per avere la possibilità di identificarlo.
 
 ## PCB
 I PCB (Process Control Block) sono la rappresentazione dei processi attraverso l'utilizzo di una struttura dati. La parte fondamentale che li rende interconnessi ad un livello di astrazione maggiore (Process Queue, Process Tree) sarebbe l'utilizzo della struttura dati `list_head`.
@@ -42,7 +49,27 @@ Infatti sono presenti in diversi campi:
 
 - `p_sib` serve per collegarlo alla lista dei suoi fratelli 
 
+## Architettura della Memoria
+Il sistema PandOSsh adotta una strategia di **allocazione statica** per la gestione dei *Process Control Blocks* (PCB). In questo modo si può elimina la necessità di gestire la memoria dinamica durante l'esecuzione del kernel, riducendo il rischio di frammentazione e garantendo tempi di esecuzione deterministici.
+
+### Componenti Principali
+- **pcbFree_table:** Array statico di dimensione `MAXPROC` che funge da pool fisico di memoria.
+- **pcbFree_h:** Sentinella (list_head) della lista dei processi liberi.
+- **next_pid:** Contatore intero per l'assegnazione di identificativi univoci ai processi.
+
 ## Allocazione deallocazione PCB
+### Inizializzazione (`initPcbs`)
+La funzione `initPcbs` prepara il sistema durante la fase di avvio. Inizializza la sentinella `pcbFree_h` e inserisce tutti i PCB contenuti nell'array statico all'interno della lista dei liberi. Ogni elemento viene predisposto tramite la macro `INIT_LIST_HEAD`.
+
+### Allocazione (`allocPcb`)
+Questa funzione permette di prelevare un PCB dal pool per attivare un nuovo processo.
+    1. **Rimozione:** Estrae il primo elemento disponibile dalla lista `pcbFree_h`. Se la lista è vuota, restituisce `NULL`.
+    2. **Reset:** Tutti i campi della struttura vengono azzerati (priorità, tempi, puntatori ai semafori) per garantire che il nuovo processo non erediti dati "sporchi".
+    3. **Identificazione:** Assegna un PID univoco incrementando `next_pid`. In caso di overflow del contatore, il sistema lo resetta automaticamente a 1.
+
+### Deallocazione (`freePcb`)
+Utilizzata quando un processo termina. La funzione esegue un "deep reset" del PCB (azzerando relazioni parentali e priorità) e lo reinserisce nella coda dei liberi, rendendolo disponibile per future allocazioni.
+
 
 ## Scelte implementative
 - È stato introdotto una nuova funzione:
@@ -66,23 +93,27 @@ Tale scelta ha portato:
     void insertProcQ(struct list_head* head, pcb_t* p);
 ```
 
-- Il costo della rimozione di un PCB specificato è semplicemente il costo della ricerca in una lista che nel caso pessimo è `O(n)` per identificare punto di inserimento
+- Il costo della rimozione di un PCB specificato è semplicemente il costo della ricerca in una lista che nel caso pessimo è `O(n)` per identificare punto di inserimento. Viene garantito la stabilità dell'inserimento, ovvero il nuovo processo viene inserito dopo quelli già presenti con la stessa priorità.
 ```c
     pcb_t* outProcQ(struct list_head* head, pcb_t* p);
 ```
+- `mkEmptyProcQ`: Inizializza una testa della lista (sentinella) come vuota.
 
+- `emptyProcQ`: Verifica se la lista contiene elementi (`head→next==head`).
+
+- `headProcQ`: Restituisce il puntatore al primo PCB della lista senza rimuoverlo.
 
 ### Analisi costo per inserimento
 In fase di progettazione, abbiamo ipotizzato soluzioni per ottimizzare l'inserimento cercando di ridurre il costo del caso pessimo, ma sono state scartate per i seguenti motivi:
 
-1. Array di liste: L'idea di utilizzare un array dove ogni indice corrisponde a un livello di priorità avrebbe garantito accessi `O(1)`. Tuttavia, i file di configurazione forniti non definiscono un valore massimo per la priorità, rendendo impossibile un'allocazione statica dell'array. Inoltre, con priorità sparse, si verificherebbe un inutile spreco di memoria.
+1. **Array di liste**: L'idea di utilizzare un array dove ogni indice corrisponde a un livello di priorità avrebbe garantito accessi `O(1)`. Tuttavia, i file di configurazione forniti non definiscono un valore massimo per la priorità, rendendo impossibile un'allocazione statica dell'array. Inoltre, con priorità sparse, si verificherebbe un inutile spreco di memoria.
 
-2. Tabelle Hash: L'utilizzo di una hashmap è stato escluso poiché la gestione delle collisioni (tramite concatenamento o indirizzamento aperto) non eliminerebbe la necessità di scansioni lineari, introducendo al contempo un overhead di memoria e una maggiore complessità logica.
+2. **Tabelle Hash**: L'utilizzo di una hashmap è stato escluso poiché la gestione delle collisioni (tramite concatenamento o indirizzamento aperto) non eliminerebbe la necessità di scansioni lineari, introducendo al contempo un overhead di memoria e una maggiore complessità logica.
 
-Considerando che il numero massimo di processi gestiti è limitato a 20, l'overhead causato dalla scansione `O(n)` è del tutto trascurabile. La scelta di una lista ordinata risulta quindi la più efficiente in termini di rapporto tra semplicità del codice, utilizzo di memoria e prestazioni reali.
+Considerando che il numero massimo di processi gestiti è limitato a 20 (`MAXPROC`), l'overhead causato dalla scansione `O(n)` è del tutto trascurabile. La scelta di una lista ordinata risulta quindi la più efficiente in termini di rapporto tra semplicità del codice, utilizzo di memoria e prestazioni reali.
 
 ### Scelte implementative discutibili
-- `insertProcQ`: è stato deciso di utilizzare la funzione `__list_add` in modo che fosse chiaro il punto di inserimento. Naturalmente l'alternativa sarebbe quello di usare `list_add_tail`, il quale farebbe la stessa cosa, però risulta meno leggibile il codice. 
+- `insertProcQ`: è stato deciso di utilizzare la funzione `__list_add` in modo che fosse chiaro il punto di inserimento. L'alternativa sarebbe quello di usare `list_add_tail`, il quale farebbe la stessa cosa, però risulta meno leggibile il codice. 
 
 ### Possibile utilizzo della Process Queue
 Un esempio banale dell'utilizzo della Process Queue può essere quello per aiutare la scelta dello scheduler di quali processi mandare in esecuzione dalla coda ready. Naturalmente negli scheduler veri bisogna anche considerare per quanto tempo un processo non è stato eseguito e aumentargli priorità, quindi si potrebbe fare  con una rimozione e un reinserimento dopo l'aumento della priorità.  
