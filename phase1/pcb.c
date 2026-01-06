@@ -35,8 +35,6 @@ void initPcbs() {
 }
 
 void freePcb(pcb_t* p) {
-    if (p == NULL) return; /* Controllo di sicurezza sempre utile, con puntatore nullo non si fa nulla */
-
     /* Reset di tutti i campi del PCB e inizializzazione delle liste */
     p->p_parent = NULL;
     INIT_LIST_HEAD(&(p->p_child));
