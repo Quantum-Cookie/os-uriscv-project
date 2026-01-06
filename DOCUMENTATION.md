@@ -80,28 +80,21 @@ In quanto si è notata la parziale duplicazione del codice tra la funzione `remo
 Tale funzione è statica in quanto è necessario solo all'interno di `pcb.c`
 
 ## Gestione della coda dei processi
-La coda dei processi (implementata tramite una lista doppiamente concatenata circolare), è gestita come coda con priorità. Mantenute in ordine decrescente di priorità memorizzato in `p_prio`. 
+La coda dei processi (implementata tramite una lista doppiamente concatenata circolare), è gestita come coda con priorità. Mantenute in ordine decrescente di priorità memorizzato in `p_prio`.  
+Il modulo fornisce le seguenti operazioni fondamentali:
 
-Tale scelta ha portato:
-- La rimozione dell'elemento con priorità maggiore con costo `O(1)` in qualunque caso.
-```c
-    pcb_t* removeProcQ(struct list_head* head);
-``` 
-
-- Tuttavia la necessità di mantenerlo ordinato provoca un aumento di costo computazionale per l'inserimento nel caso pessimo, il quale risulta essere `O(n)`.
-```c
-    void insertProcQ(struct list_head* head, pcb_t* p);
-```
-
-- Il costo della rimozione di un PCB specificato è semplicemente il costo della ricerca in una lista che nel caso pessimo è `O(n)` per identificare punto di inserimento. Viene garantito la stabilità dell'inserimento, ovvero il nuovo processo viene inserito dopo quelli già presenti con la stessa priorità.
-```c
-    pcb_t* outProcQ(struct list_head* head, pcb_t* p);
-```
 - `mkEmptyProcQ`: Inizializza una testa della lista (sentinella) come vuota.
 
 - `emptyProcQ`: Verifica se la lista contiene elementi (`head→next==head`).
 
 - `headProcQ`: Restituisce il puntatore al primo PCB della lista senza rimuoverlo.
+
+**Analisi delle prestazioni**:
+- `removeProcQ`: La rimozione dell'elemento con priorità maggiore con costo `O(1)` in qualunque caso.
+
+- `insertProcQ`: Tuttavia la necessità di mantenerlo ordinato provoca un aumento di costo computazionale per l'inserimento nel caso pessimo, il quale risulta essere `O(n)`. Inoltre viene garantita la stabilità dell'inserimento, ovvero il nuovo processo viene inserito dopo quelli già presenti con la stessa priorità.
+
+- `outProcQ`: Il costo della rimozione di un PCB specificato è semplicemente il costo della ricerca in una lista che nel caso pessimo è `O(n)`. 
 
 ### Analisi costo per inserimento
 In fase di progettazione, abbiamo ipotizzato soluzioni per ottimizzare l'inserimento cercando di ridurre il costo del caso pessimo, ma sono state scartate per i seguenti motivi:
@@ -110,7 +103,7 @@ In fase di progettazione, abbiamo ipotizzato soluzioni per ottimizzare l'inserim
 
 2. **Tabelle Hash**: L'utilizzo di una hashmap è stato escluso poiché la gestione delle collisioni (tramite concatenamento o indirizzamento aperto) non eliminerebbe la necessità di scansioni lineari, introducendo al contempo un overhead di memoria e una maggiore complessità logica.
 
-Considerando che il numero massimo di processi gestiti è limitato a 20 (`MAXPROC`), l'overhead causato dalla scansione `O(n)` è del tutto trascurabile. La scelta di una lista ordinata risulta quindi la più efficiente in termini di rapporto tra semplicità del codice, utilizzo di memoria e prestazioni reali.
+**Conclusione:** Considerando che il numero massimo di processi gestiti è limitato a 20 (`MAXPROC`), l'overhead causato dalla scansione `O(n)` è del tutto trascurabile. La scelta di una lista ordinata risulta quindi la più efficiente in termini di rapporto tra semplicità del codice, utilizzo di memoria e prestazioni reali.
 
 ### Scelte implementative discutibili
 - `insertProcQ`: è stato deciso di utilizzare la funzione `__list_add` in modo che fosse chiaro il punto di inserimento. L'alternativa sarebbe quello di usare `list_add_tail`, il quale farebbe la stessa cosa, però risulta meno leggibile il codice. 
