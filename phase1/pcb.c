@@ -5,18 +5,66 @@ static pcb_t pcbFree_table[MAXPROC];
 static int next_pid = 1;
 
 void initPcbs() {
+    INIT_LIST_HEAD(&pcbFree_h);
+    for (int i = 0; i < MAXPROC; i++) {
+
+        /* Inizializzazione dei puntatori della lista interna al PCB 
+        e inserimento del PCB corrente nella lista dei PCB liberi */
+        INIT_LIST_HEAD(&(pcbFree_table[i].p_list));
+        list_add_tail(&(pcbFree_table[i].p_list), &pcbFree_h);
+    }
 }
 
 void freePcb(pcb_t* p) {
+    if (p == NULL) return; /* Controllo di sicurezza sempre utile, con puntatore nullo non si fa nulla */
+
+    /* Reset di tutti i campi del PCB e inizializzazione delle liste */
+    p->p_parent = NULL;
+    INIT_LIST_HEAD(&(p->p_child));
+    INIT_LIST_HEAD(&(p->p_sib));
+    p->p_semAdd = NULL;
+    p->p_supportStruct = NULL;
+    p->p_prio = 0;
+    p->p_time = 0;
+    p->p_pid = 0;
+
+    /* Reinserimento del PCB nella lista dei PCB liberi */
+    list_add_tail(&(p->p_list), &pcbFree_h);
 }
 
 pcb_t* allocPcb() {
+    /* Estrae un PCB dalla lista dei liberi */
+    struct list_head *removed = listRemoveFirst(&pcbFree_h);
+    if (!removed)
+        return NULL;
+
+    pcb_t *newPcb = container_of(removed, pcb_t, p_list);
+
+    /* Inizializza i campi del PCB */
+    newPcb->p_parent = NULL;
+    INIT_LIST_HEAD(&(newPcb->p_child));
+    INIT_LIST_HEAD(&(newPcb->p_sib));
+    newPcb->p_semAdd = NULL;
+    newPcb->p_supportStruct = NULL;
+    newPcb->p_prio = 0;
+    newPcb->p_time = 0;
+
+    /* Serve per assegnare un PID univoco */
+    newPcb->p_pid = next_pid++;
+    if (next_pid <= 0) /* Per la gestione overflow */
+        next_pid = 1;
+
+    return newPcb;
 }
 
 void mkEmptyProcQ(struct list_head* head) {
+    /*Inizializza una coda di processi come vuota. */
+    INIT_LIST_HEAD(head);
 }
 
 int emptyProcQ(struct list_head* head) {
+    /*Controlla se la coda dei processi è vuota. */
+    return list_empty(head);
 }
 
 void insertProcQ(struct list_head* head, pcb_t* p) {
@@ -41,6 +89,16 @@ void insertProcQ(struct list_head* head, pcb_t* p) {
 }
 
 pcb_t* headProcQ(struct list_head* head) {
+    /* Verifica che la coda sia vuota */
+    if (emptyProcQ(head)) {
+        return NULL;
+    }
+
+    /* Prende il primo elemento della lista */
+    struct list_head *first = head->next;
+
+    /* Restituisce il PCB relativo al primo elemento della lista */
+    return container_of(first, pcb_t, p_list);
 }
 
 /**
