@@ -4,6 +4,25 @@ static struct list_head pcbFree_h;
 static pcb_t pcbFree_table[MAXPROC];
 static int next_pid = 1;
 
+/**
+ *  @brief Estrae il primo elemento della lista puntato da head e pulisce i suoi campi
+ *  
+ *  @param head Puntatore alla testa della lista da cui rimuovere l'elemento
+ * 
+ *  @return NULL se la lista e' vuota, altrimenti restituisce il puntatore a elemento rimosso
+ */
+static struct list_head *listRemoveFirst(struct list_head *head) {
+    /* Controllo per vedere se la lista e' vuota o meno */ 
+    if (list_empty(head))
+        return NULL;
+
+    /* Rimuove primo elemento della lista e pulisce i suoi campi di list_head */
+    struct list_head *toRemove = head->next;
+    list_del(toRemove);
+
+    return toRemove;
+}
+
 void initPcbs() {
     INIT_LIST_HEAD(&pcbFree_h);
     for (int i = 0; i < MAXPROC; i++) {
@@ -99,25 +118,6 @@ pcb_t* headProcQ(struct list_head* head) {
 
     /* Restituisce il PCB relativo al primo elemento della lista */
     return container_of(first, pcb_t, p_list);
-}
-
-/**
- *  @brief Estrae il primo elemento della lista puntato da head e pulisce i suoi campi
- *  
- *  @param head Puntatore alla testa della lista da cui rimuovere l'elemento
- * 
- *  @return NULL se la lista e' vuota, altrimenti restituisce il puntatore a elemento rimosso
- */
-static struct list_head *listRemoveFirst(struct list_head *head) {
-    /* Controllo per vedere se la lista e' vuota o meno */ 
-    if (list_empty(head))
-        return NULL;
-
-    /* Rimuove primo elemento della lista e pulisce i suoi campi di list_head */
-    struct list_head *toRemove = head->next;
-    list_del(toRemove);
-
-    return toRemove;
 }
 
 pcb_t* removeProcQ(struct list_head* head) {
