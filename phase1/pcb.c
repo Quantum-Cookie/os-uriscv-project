@@ -89,6 +89,16 @@ void insertProcQ(struct list_head* head, pcb_t* p) {
 }
 
 pcb_t* headProcQ(struct list_head* head) {
+    /* Verifica che la coda sia vuota */
+    if (emptyProcQ(head)) {
+        return NULL;
+    }
+
+    /* Prende il primo elemento della lista */
+    struct list_head *first = head->next;
+
+    /* Restituisce il PCB relativo al primo elemento della lista */
+    return container_of(first, pcb_t, p_list);
 }
 
 /**
