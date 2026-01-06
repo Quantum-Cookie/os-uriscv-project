@@ -37,4 +37,9 @@ uriscv config_machine.json
 ```
 
 ## Testing
-Attualmente il progetto è configurato per essere compilato insieme al file di test. Quindi una volta avviata la macchina e fatta partire l'esecuzione, sul terminale dalla quale è stata avviata si dovrebbe lo stato dei controlli delle varie funzioni implementate.
+Attualmente il progetto è configurato per essere compilato insieme al file di test `/phase1/p1test.c`.
+
+Una volta avviata la macchina e fatta partire l'esecuzione, sul terminale dalla quale è stata avviata si dovrebbero vedere i risultati dei test.
+
+Il corretto superamento è confermato dal messaggio:
+>**So Long and Thanks for All the Fish**.
