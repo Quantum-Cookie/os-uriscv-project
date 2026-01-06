@@ -3,15 +3,20 @@
 ## Description
 PandOSsh è un progetto educativo pensato per comprendere il funzionamento reale di un sistema operativo.  
 
+- Fase 1: Implementazione delle strutture dati fondamentali che rappresentano entità dai livelli superiori:
+    - **PCB (Process Control Block):** rappresentano i processi.
+    - **ASL (Active Semaphore List):** gestisce i semafori e i relativi processi bloccati.
+
 ## Requirements
 - **CMake** >= 3.25
 - **Toolchain:** gcc-riscv64-unknown-elf
 
 ## Emulator
-- Usiamo **uRISCV** per eseguire il progetto - [GitHub uRISCV](https://github.com/virtualsquare/uriscv)
+- Usiamo **uRISCV** per l'esecuzione il progetto - [GitHub uRISCV](https://github.com/virtualsquare/uriscv)
 
 ## Build 
 Per compilare il progetto eseguire i seguenti comandi nella cartella principale:
+
 ```bash
 cmake -B build
 cmake --build build
@@ -26,7 +31,7 @@ uriscv
 
 Caricare in seguito all'avvio il file di configurazione `config_machine.json`.
 
-Oppure per avviare l'emulatore con già la configurazione caricata:
+In alternativa è possibile avviare l'emulatore con già la configurazione caricata:
 ```bash
 uriscv config_machine.json
 ```
