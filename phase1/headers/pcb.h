@@ -78,13 +78,14 @@ void insertProcQ(struct list_head* head, pcb_t* p);
 
 // Return the first PCB in the list "head" without removing it
 /** 
- * @brief restituisce il primo processo della lista
+ * @brief Restituisce il primo PCB nella lista head senza rimuoverlo.
  * 
- * @param head puntatore al PCB da restituire
+ * @param head Puntatore alla testa della lista di PCB
  * 
- * @return void 
+ * @return pcb_t* Puntatore al primo PCB nella lista, o NULL se la lista è vuota
  * 
-*/
+ */
+
 pcb_t* headProcQ(struct list_head* head);
 
 // Remove and return the first PCB in the list "head"
