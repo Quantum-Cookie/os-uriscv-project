@@ -102,7 +102,7 @@ void insertProcQ(struct list_head* head, pcb_t* p) {
 
     /*  Inserisce p immediatamente prima di insertPos.
         Se insertPos e' ancora head alla viene inserito in fondo alla lista */
-    __list_add(&(p->p_list), insertPos->prev, insertPos);
+    list_add_tail(&(p->p_list), insertPos);
 }
 
 pcb_t* headProcQ(struct list_head* head) {
