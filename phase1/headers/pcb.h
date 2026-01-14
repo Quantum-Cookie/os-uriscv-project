@@ -15,7 +15,6 @@
  * Ogni PCB viene inizializzato e inserito nella lista dei PCB liberi.
  * 
  */
-
 void initPcbs();
 
 // Add PCB "p" to the list "pcbFree_h"
@@ -27,7 +26,6 @@ void initPcbs();
  * @return void 
  * 
 */
-
 void freePcb(pcb_t* p);
 
 // Allocate new PCB removing one from list "pcbFree_h" if possible
@@ -38,7 +36,6 @@ void freePcb(pcb_t* p);
  * @return pcb_t* Puntatore al PCB allocato o NULL se non ci sono PCB liberi
  * 
  */
-
 pcb_t* allocPcb();
 
 // Create an empty PCB list
@@ -48,7 +45,6 @@ pcb_t* allocPcb();
  * @param head Puntatore alla testa della lista di PCB da inizializzare
  * 
  */
-
 void mkEmptyProcQ(struct list_head* head);
 
 // Check if the PCB list "head" is empty
@@ -60,7 +56,6 @@ void mkEmptyProcQ(struct list_head* head);
  * @return int Restituisce 1 se la lista è vuota, 0 altrimenti
  * 
  */
-
 int emptyProcQ(struct list_head* head);
 
 // Insert PCB "p" in the list "head"
@@ -85,7 +80,6 @@ void insertProcQ(struct list_head* head, pcb_t* p);
  * @return pcb_t* Puntatore al primo PCB nella lista, o NULL se la lista è vuota
  * 
  */
-
 pcb_t* headProcQ(struct list_head* head);
 
 // Remove and return the first PCB in the list "head"
