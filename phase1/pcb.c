@@ -61,10 +61,21 @@ pcb_t* allocPcb() {
     newPcb->p_parent = NULL;
     INIT_LIST_HEAD(&(newPcb->p_child));
     INIT_LIST_HEAD(&(newPcb->p_sib));
+
+    newPcb->p_s.entry_hi = 0;
+    newPcb->p_s.cause = 0;
+    newPcb->p_s.status = 0; 
+    newPcb->p_s.pc_epc = 0; 
+    newPcb->p_s.mie = 0;
+    for (int i = 0; i < STATE_GPR_LEN; i++) {
+        newPcb->p_s.gpr[i] = 0;
+    }
+    
+    newPcb->p_time = 0;
+
     newPcb->p_semAdd = NULL;
     newPcb->p_supportStruct = NULL;
     newPcb->p_prio = 0;
-    newPcb->p_time = 0;
 
     /* Serve per assegnare un PID univoco */
     newPcb->p_pid = next_pid++;
