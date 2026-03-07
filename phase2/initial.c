@@ -1,4 +1,8 @@
 #include "./headers/initial.h"
+#include "../phase1/headers/pcb.h"
+#include "../phase1/headers/asl.h"
+#include "./headers/exceptions.h"
+#include "./headers/scheduler.h"
 
 extern void uTLB_RefillHandler();
 extern void test();
