@@ -6,4 +6,4 @@
 
 # Configurazione vscode
 .vscode/
-
+.clangd
