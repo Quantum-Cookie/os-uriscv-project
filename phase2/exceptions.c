@@ -1,5 +1,32 @@
 #include "./headers/exceptions.h"
+#include <uriscv/liburiscv.h>
 
 void exceptionHandler() {
-    return;
+    unsigned int cause = getCAUSE();
+    
+    // Verifica se l'eccezione sia un interrupt
+    if (CAUSE_IS_INT(cause))
+        deviceInterruptHandler();
+    else {
+        switch (GET_EXEC_CODE(cause))
+        {
+            case 24 ... 28:
+                tlbExceptionHandler();
+                break;
+
+            case 8:
+            case 11:
+                syscallExceptionHandler();
+                break;
+
+            case 0 ... 7:
+            case 9 ... 10:
+            case 12 ... 23:
+                programTrapExceptionHandler();
+                break;
+
+            default:
+                break;
+        } 
+    }
 }

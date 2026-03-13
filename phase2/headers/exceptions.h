@@ -1,7 +1,21 @@
 #ifndef EXCEPTIONS_H
 #define EXCEPTIONS_H
 
+#include "../../headers/listx.h"
+#include "../../headers/types.h"
+#include "../../headers/const.h"
+
+// Controlla se il bit piu' significativo della causa sia 1 o meno
+#define CAUSE_IS_INT(cause) (((cause) & 0x80000000) != 0)
+
+// Restituisce l'exception code
+#define GET_EXEC_CODE(cause) (((cause) & GETEXECCODE) >> CAUSESHIFT)
+
 void exceptionHandler();
+void deviceInterruptHandler();
+void tlbExceptionHandler();
+void syscallExceptionHandler();
+void programTrapExceptionHandler();
 
 #endif // !EXCEPTIONS_H
 
