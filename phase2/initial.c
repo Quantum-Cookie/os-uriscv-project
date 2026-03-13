@@ -48,6 +48,9 @@ void initFirstProcess() {
     // allocPcb imposta gia' i campi con 0/NULL
     pcb_t* firstProcess = allocPcb();
 
+    // Imposta il SP all'ultimo frame della RAM
+    RAMTOP(firstProcess->p_s.reg_sp);
+
     // Abilita gli interrupt e Kernel-mode
     firstProcess->p_s.mie = MIE_ALL;
     firstProcess->p_s.status = MSTATUS_MPIE_MASK | MSTATUS_MPP_M;
