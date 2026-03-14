@@ -11,11 +11,15 @@
 // Restituisce l'exception code
 #define GET_EXEC_CODE(cause) (((cause) & GETEXECCODE) >> CAUSESHIFT)
 
+#define PROCESSOR_ID 0
+
 void exceptionHandler();
 void deviceInterruptHandler();
 void tlbExceptionHandler();
-void syscallExceptionHandler();
+void syscallExceptionHandler(state_t* processorState);
 void programTrapExceptionHandler();
+
+void createProcess(state_t* processorState);
 
 #endif // !EXCEPTIONS_H
 
