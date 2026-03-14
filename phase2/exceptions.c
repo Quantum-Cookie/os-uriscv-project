@@ -9,7 +9,7 @@ void exceptionHandler() {
         deviceInterruptHandler();
     }
     else {
-        switch (GET_EXEC_CODE(cause)) {
+        switch (cause) {
             case 24 ... 28:
                 tlbExceptionHandler();
                 break;
