@@ -1,6 +1,6 @@
 #include "./headers/exceptions.h"
 #include <uriscv/liburiscv.h>
-#include "../phase1/headers/pcb.h"
+#include "./headers/scheduler.h"
 
 void exceptionHandler() {
     unsigned int cause = getCAUSE();
@@ -35,8 +35,11 @@ void exceptionHandler() {
 
 void syscallExceptionHandler(state_t* processorState) {
     switch (processorState->reg_a0) {
-        case -1:
+        case CREATEPROCESS:
             createProcess(processorState);
+            break;
+        case TERMPROCESS:
+            terminateProcess(processorState);
             break;
     }
 }
@@ -79,6 +82,47 @@ void createProcess(state_t* processorState) {
     // Restituzione pid al chiamante
     processorState->reg_a0 = newPcb->p_pid;
 }
+
+
+/***
+ * TODO: Finire terminateProcess
+ * 
+ * Da decidere come implementare ricerca tramite p_pid:
+ * 1. Mantenere lista di tutti i PCB allocati
+ * 2. Scansionare a partire dal processo root
+ */
+void recursiveTermination(pcb_t* toTerminate) {
+    // Se il processo non ha figli
+    if (emptyChild(toTerminate)) {
+        // Se il processo non era nella Ready Queue lo toglie dai processi bloccati nei semafori
+        if (!outProcQ(&readyQueue, toTerminate))
+            outBlocked(toTerminate);
+        freePcb(toTerminate);
+    }
+    // Se il processo ha figli
+    else {
+        while (emptyChild(toTerminate))
+        {
+            // Itera per terminare tutti i processi figli
+            pcb_t* childToTerminate = removeChild(toTerminate);
+            recursiveTermination(childToTerminate);
+        }
+    }
+}
+
+void terminateProcess(state_t* processorState) {
+    if (processorState->reg_a1 == 0) {
+        recursiveTermination(currentProcess);
+    } 
+    else {
+        recursiveTermination(currentProcess);
+    }
+    scheduler();
+}
+
+/***
+ * FINE TODO
+ */
 
 void deviceInterruptHandler() {return;};
 void tlbExceptionHandler() {return;};
