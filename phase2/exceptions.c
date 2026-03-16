@@ -22,6 +22,8 @@ static void programTrapExceptionHandler();
 
 static void createProcess(state_t* processorState);
 static void terminateProcess(state_t* processorState);
+static void passren(state_t* processorState);
+static void verhogen(state_t* processorState);
 
 
 void exceptionHandler() {
@@ -62,6 +64,12 @@ void syscallExceptionHandler(state_t* processorState) {
             break;
         case TERMPROCESS:
             terminateProcess(processorState);
+            break;
+        case PASSEREN:
+            passren(processorState);
+            break;
+        case VERHOGEN:
+            verhogen(processorState);
             break;
     }
 }
@@ -152,6 +160,37 @@ static void terminateProcess(state_t* processorState) {
 /***
  * FINE TODO
  */
+
+static void passren(state_t* processorState) {
+    int* semadrr = (int*)processorState->reg_a1;
+    (*semadrr)--;
+
+    processorState->pc_epc += 4;
+
+    if (*semadrr < 0) {
+        copyState(processorState, &currentProcess->p_s);
+        insertBlocked(semadrr, currentProcess);
+        scheduler();
+    }
+    else {
+        LDST(processorState);
+    }
+}
+
+static void verhogen(state_t* processorState) {
+    int* semadrr = (int*)processorState->reg_a1;
+    (*semadrr)++;
+
+    if (*semadrr <= 0) {
+        pcb_t* readyProc = removeBlocked(semadrr);
+        if (readyProc)
+            insertProcQ(&readyQueue, readyProc);
+    }
+
+    processorState->pc_epc += 4;
+    LDST(processorState);
+}
+
 
 static void deviceInterruptHandler() {return;};
 static void tlbExceptionHandler() {return;};
