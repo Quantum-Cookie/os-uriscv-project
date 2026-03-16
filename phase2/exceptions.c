@@ -2,6 +2,28 @@
 #include <uriscv/liburiscv.h>
 #include "./headers/scheduler.h"
 
+#include "../headers/listx.h"
+#include "../headers/types.h"
+#include "../headers/const.h"
+
+#include "../phase1/headers/pcb.h"
+#include "../phase1/headers/asl.h"
+#include "./headers/initial.h"
+
+// Controlla se il bit piu' significativo della causa sia 1 o meno
+#define CAUSE_IS_INT(cause) (((cause) & 0x80000000) != 0)
+
+#define PROCESSOR_ID 0
+
+static void deviceInterruptHandler();
+static void tlbExceptionHandler();
+static void syscallExceptionHandler(state_t* processorState);
+static void programTrapExceptionHandler();
+
+static void createProcess(state_t* processorState);
+static void terminateProcess(state_t* processorState);
+
+
 void exceptionHandler() {
     unsigned int cause = getCAUSE();
     
@@ -44,7 +66,7 @@ void syscallExceptionHandler(state_t* processorState) {
     }
 }
 
-void copyState(state_t* src, state_t* dest) {
+static void copyState(state_t* src, state_t* dest) {
     dest->entry_hi = src->entry_hi;
     dest->cause = src->cause;
     dest->status = src->status;
@@ -57,7 +79,7 @@ void copyState(state_t* src, state_t* dest) {
     }
 }
 
-void createProcess(state_t* processorState) {
+static void createProcess(state_t* processorState) {
     pcb_t* newPcb = allocPcb();
 
     // Controllo se ci sono ancora PCB liberi
@@ -91,7 +113,7 @@ void createProcess(state_t* processorState) {
  * 1. Mantenere lista di tutti i PCB allocati
  * 2. Scansionare a partire dal processo root
  */
-void recursiveTermination(pcb_t* toTerminate) {
+static void recursiveTermination(pcb_t* toTerminate) {
     // Se il processo non ha figli
     if (emptyChild(toTerminate)) {
         // Se il processo non era nella Ready Queue lo toglie dai processi bloccati nei semafori
@@ -110,7 +132,7 @@ void recursiveTermination(pcb_t* toTerminate) {
     }
 }
 
-void terminateProcess(state_t* processorState) {
+static void terminateProcess(state_t* processorState) {
     if (processorState->reg_a1 == 0) {
         recursiveTermination(currentProcess);
     } 
@@ -124,6 +146,6 @@ void terminateProcess(state_t* processorState) {
  * FINE TODO
  */
 
-void deviceInterruptHandler() {return;};
-void tlbExceptionHandler() {return;};
-void programTrapExceptionHandler() {return;};
+static void deviceInterruptHandler() {return;};
+static void tlbExceptionHandler() {return;};
+static void programTrapExceptionHandler() {return;};

@@ -11,9 +11,4 @@ extern struct list_head readyQueue;
 extern pcb_t* currentProcess;
 extern int deviceSemaphore[NRSEMAPHORES];
 
-
-void initPassupvector();
-void initNucleusData();
-void initFirstProcess();
-
 #endif // !INITAL_H

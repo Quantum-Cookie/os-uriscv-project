@@ -4,6 +4,10 @@
 #include "./headers/exceptions.h"
 #include "./headers/scheduler.h"
 
+static void initPassupvector();
+static void initNucleusData();
+static void initFirstProcess();
+
 extern void uTLB_RefillHandler();
 extern void test();
 
@@ -14,7 +18,7 @@ struct list_head readyQueue;
 pcb_t* currentProcess;
 int deviceSemaphore[NRSEMAPHORES];
 
-void initPassupvector() {
+static void initPassupvector() {
     passupvector_t* passupvector = (passupvector_t *)PASSUPVECTOR;
 
     // Indirizzi per gestire eventi TLB-Refill
@@ -26,7 +30,7 @@ void initPassupvector() {
     passupvector->exception_stackPtr = KERNELSTACK;
 }
 
-void initNucleusData() {
+static void initNucleusData() {
     // Inizializzazione strutture dati di Livello 2
     initPcbs();
     initASL();
@@ -42,7 +46,7 @@ void initNucleusData() {
     LDIT(PSECOND);
 }
 
-void initFirstProcess() {
+static void initFirstProcess() {
     processCount++;
 
     // allocPcb imposta gia' i campi con 0/NULL
