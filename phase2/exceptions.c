@@ -85,6 +85,9 @@ static void createProcess(state_t* processorState) {
     // Controllo se ci sono ancora PCB liberi
     if (!newPcb) {
         processorState->reg_a0 = -1;
+
+        processorState->pc_epc += 4;
+        LDST(processorState);
         return;
     }
 
@@ -103,6 +106,10 @@ static void createProcess(state_t* processorState) {
 
     // Restituzione pid al chiamante
     processorState->reg_a0 = newPcb->p_pid;
+
+    // Aggiorna PC e restituisce il controllo al chiamante
+    processorState->pc_epc += 4;
+    LDST(processorState);
 }
 
 
