@@ -120,6 +120,18 @@ static void createProcess(state_t* processorState) {
     LDST(processorState);
 }
 
+/**
+ * @brief Salva lo stato del processo attuale nell'apposito campo e aggiona il tempo di utilizzo CPU accumulato
+ * 
+ * @param processorState Puntatore allo stato del processore prima dell'eccezione
+ */
+static void updateProcessState(state_t* processorState) {
+    cpu_t actTime;
+    STCK(actTime);
+
+    copyState(processorState, &currentProcess->p_s);
+    currentProcess->p_time += actTime - startRunningTime;
+}
 
 static pcb_t* searchByPid(int pid, pcb_t* root) {
     if (root->p_pid == pid) 
@@ -159,11 +171,8 @@ static void terminateProcess(state_t* processorState) {
             recursiveTermination(toTerminate);
 
         processorState->pc_epc += 4;
-        copyState(processorState, &currentProcess->p_s);
-
-        cpu_t actTime;
-        STCK(actTime);
-        currentProcess->p_time += actTime - startRunningTime;
+        
+        updateProcessState(processorState);
 
         insertProcQ(&readyQueue, currentProcess);
     }
@@ -178,7 +187,7 @@ static void passren(state_t* processorState) {
     processorState->pc_epc += 4;
 
     if (*semadrr < 0) {
-        copyState(processorState, &currentProcess->p_s);
+        updateProcessState(processorState);
         insertBlocked(semadrr, currentProcess);
         scheduler();
     }
