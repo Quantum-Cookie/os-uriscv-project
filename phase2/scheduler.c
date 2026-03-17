@@ -14,6 +14,9 @@ void scheduler() {
         // Imposta 5ms il PLT, ovvero il time slice dedicato
         setTIMER(TIMESLICE);
 
+        // Memorizza il tempo in cui e' iniziato l'esecuzione
+        STCK(startRunningTime);
+
         // Ripristina lo stato del processore per il processo
         LDST(&runningProcess->p_s);
     }

@@ -18,6 +18,9 @@ struct list_head readyQueue;
 pcb_t* currentProcess;
 int deviceSemaphore[NRSEMAPHORES];
 
+pcb_t* rootProcess;
+cpu_t startRunningTime;
+
 static void initPassupvector() {
     passupvector_t* passupvector = (passupvector_t *)PASSUPVECTOR;
 
@@ -61,6 +64,8 @@ static void initFirstProcess() {
 
     // Imposta il PC del primo processo alla funzione test
     firstProcess->p_s.pc_epc = (memaddr) test;
+
+    rootProcess = firstProcess;
 
     insertProcQ(&readyQueue, firstProcess);
 }

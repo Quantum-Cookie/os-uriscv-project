@@ -121,45 +121,55 @@ static void createProcess(state_t* processorState) {
 }
 
 
-/***
- * TODO: Finire terminateProcess
- * 
- * Da decidere come implementare ricerca tramite p_pid:
- * 1. Mantenere lista di tutti i PCB allocati
- * 2. Scansionare a partire dal processo root
- */
+static pcb_t* searchByPid(int pid, pcb_t* root) {
+    if (root->p_pid == pid) 
+        return root;
+
+    pcb_t* child;
+    list_for_each_entry(child, &root->p_child, p_sib) {
+        pcb_t* res = searchByPid(pid, child);
+        if (res)
+            return res;
+    }
+    
+    return NULL;
+}
+
 static void recursiveTermination(pcb_t* toTerminate) {
-    // Se il processo non ha figli
-    if (emptyChild(toTerminate)) {
-        // Se il processo non era nella Ready Queue lo toglie dai processi bloccati nei semafori
-        if (!outProcQ(&readyQueue, toTerminate))
+    while (!emptyChild(toTerminate))
+    {
+        // Itera per terminare tutti i processi figli
+        pcb_t* childToTerminate = removeChild(toTerminate);
+        recursiveTermination(childToTerminate);
+    }
+    if (!outProcQ(&readyQueue, toTerminate))
             outBlocked(toTerminate);
         freePcb(toTerminate);
-    }
-    // Se il processo ha figli
-    else {
-        while (emptyChild(toTerminate))
-        {
-            // Itera per terminare tutti i processi figli
-            pcb_t* childToTerminate = removeChild(toTerminate);
-            recursiveTermination(childToTerminate);
-        }
-    }
 }
 
 static void terminateProcess(state_t* processorState) {
-    if (processorState->reg_a1 == 0) {
+    int pid = processorState->reg_a1;
+
+    if (pid == 0) {
         recursiveTermination(currentProcess);
     } 
     else {
-        recursiveTermination(currentProcess);
+        pcb_t* toTerminate = searchByPid(pid, rootProcess);
+        if (toTerminate)
+            recursiveTermination(toTerminate);
+
+        processorState->pc_epc += 4;
+        copyState(processorState, &currentProcess->p_s);
+
+        cpu_t actTime;
+        STCK(actTime);
+        currentProcess->p_time += actTime - startRunningTime;
+
+        insertProcQ(&readyQueue, currentProcess);
     }
+
     scheduler();
 }
-
-/***
- * FINE TODO
- */
 
 static void passren(state_t* processorState) {
     int* semadrr = (int*)processorState->reg_a1;
