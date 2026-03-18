@@ -13,6 +13,9 @@
 // Controlla se il bit piu' significativo della causa sia 1 o meno
 #define CAUSE_IS_INT(cause) (((cause) & 0x80000000) != 0)
 
+// Restituisce l'exception code
+#define GET_EXEC_CODE(cause) (((cause) & GETEXECCODE) >> CAUSESHIFT)
+
 #define PROCESSOR_ID 0
 
 static void deviceInterruptHandler();
@@ -210,7 +213,16 @@ static void verhogen(state_t* processorState) {
     LDST(processorState);
 }
 
+void processorLocalTimerInt() {
+    return;
+}
 
-static void deviceInterruptHandler() {return;};
+static void deviceInterruptHandler() {
+    unsigned int excCode = GET_EXEC_CODE(getCAUSE());
+
+    if (excCode & TIMERINTERRUPT)
+        processorLocalTimerInt();
+};
+
 static void tlbExceptionHandler() {return;};
 static void programTrapExceptionHandler() {return;};
