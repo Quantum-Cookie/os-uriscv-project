@@ -1,5 +1,6 @@
 #include "./headers/exceptions.h"
 #include <uriscv/liburiscv.h>
+#include <uriscv/cpu.h>
 #include "./headers/scheduler.h"
 
 #include "../headers/listx.h"
@@ -10,11 +11,8 @@
 #include "../phase1/headers/asl.h"
 #include "./headers/initial.h"
 
-// Controlla se il bit piu' significativo della causa sia 1 o meno
-#define CAUSE_IS_INT(cause) (((cause) & 0x80000000) != 0)
-
 // Restituisce l'exception code
-#define GET_EXEC_CODE(cause) (((cause) & GETEXECCODE) >> CAUSESHIFT)
+#define GET_EXEC_CODE(cause) (((cause) & CAUSE_EXCCODE_MASK))
 
 #define PROCESSOR_ID 0
 
@@ -37,7 +35,7 @@ void exceptionHandler() {
         deviceInterruptHandler();
     }
     else {
-        switch (cause) {
+        switch (GET_EXEC_CODE(cause)) {
             case 24 ... 28:
                 tlbExceptionHandler();
                 break;
