@@ -126,12 +126,12 @@ static void createProcess(state_t* processorState) {
  * 
  * @param processorState Puntatore allo stato del processore prima dell'eccezione
  */
-static void updateProcessState(state_t* processorState) {
+static void updateProcessState(state_t* processorState, pcb_t* process) {
     cpu_t actTime;
     STCK(actTime);
 
-    copyState(processorState, &currentProcess->p_s);
-    currentProcess->p_time += actTime - startRunningTime;
+    copyState(processorState, &process->p_s);
+    process->p_time += actTime - startRunningTime;
 }
 
 static pcb_t* searchByPid(int pid, pcb_t* root) {
@@ -173,7 +173,7 @@ static void terminateProcess(state_t* processorState) {
 
         processorState->pc_epc += 4;
         
-        updateProcessState(processorState);
+        updateProcessState(processorState, currentProcess);
 
         insertProcQ(&readyQueue, currentProcess);
     }
@@ -188,7 +188,7 @@ static void passren(state_t* processorState) {
     processorState->pc_epc += 4;
 
     if (*semadrr < 0) {
-        updateProcessState(processorState);
+        updateProcessState(processorState, currentProcess);
         insertBlocked(semadrr, currentProcess);
         scheduler();
     }
@@ -211,15 +211,25 @@ static void verhogen(state_t* processorState) {
     LDST(processorState);
 }
 
-void processorLocalTimerInt() {
-    return;
+void processorLocalTimerInt(state_t* processorState) {
+    // Acknoledge interrupt e carica il nuovo valore
+    setTIMER(TIMESLICE);
+
+    // Salva lo stato attuale di esecuzione del processo
+    updateProcessState(processorState, currentProcess);
+
+    // Inserisce il processo nella Ready Queue
+    insertProcQ(&readyQueue, currentProcess);
+
+    scheduler();
 }
 
 static void deviceInterruptHandler() {
     unsigned int excCode = GET_EXEC_CODE(getCAUSE());
 
-    if (excCode & TIMERINTERRUPT)
-        processorLocalTimerInt();
+    state_t* processorState = GET_EXCEPTION_STATE_PTR(PROCESSOR_ID);
+    if (excCode == IL_CPUTIMER)
+        processorLocalTimerInt(processorState);
 };
 
 static void tlbExceptionHandler() {return;};
