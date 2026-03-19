@@ -148,33 +148,52 @@ static pcb_t* searchByPid(int pid, pcb_t* root) {
     return NULL;
 }
 
-static void recursiveTermination(pcb_t* toTerminate) {
+static int recursiveTermination(pcb_t* toTerminate) {
+    int terminatedCurrent = (toTerminate == currentProcess);
+
     while (!emptyChild(toTerminate))
     {
         // Itera per terminare tutti i processi figli
         pcb_t* childToTerminate = removeChild(toTerminate);
-        recursiveTermination(childToTerminate);
+        terminatedCurrent += recursiveTermination(childToTerminate);
     }
-    if (!outProcQ(&readyQueue, toTerminate))
-            outBlocked(toTerminate);
-        freePcb(toTerminate);
+
+    if (toTerminate->p_semAdd) {
+        outBlocked(toTerminate);
+        softBlockCount--;
+    } else if (toTerminate != currentProcess) {
+        outProcQ(&readyQueue, toTerminate);
+    }
+
+    processCount--;
+    freePcb(toTerminate);
+
+    return (terminatedCurrent > 0);
 }
 
 static void terminateProcess(state_t* processorState) {
     int pid = processorState->reg_a1;
+    int terminatedCurrent = 0;
+    pcb_t* toTerminate =  NULL;
 
     if (pid == 0) {
-        recursiveTermination(currentProcess);
-    } 
+        toTerminate = currentProcess;
+    }
     else {
-        pcb_t* toTerminate = searchByPid(pid, rootProcess);
-        if (toTerminate)
-            recursiveTermination(toTerminate);
+        toTerminate = searchByPid(pid, rootProcess);
+    }
 
+    if (toTerminate) {
+        outChild(toTerminate);
+        terminatedCurrent = recursiveTermination(toTerminate);
+       
+    }
+
+    if (!terminatedCurrent) {
         processorState->pc_epc += 4;
         
         updateProcessState(processorState, currentProcess);
-
+    
         insertProcQ(&readyQueue, currentProcess);
     }
 
