@@ -1,6 +1,8 @@
 #include "./headers/exceptions.h"
 #include <uriscv/liburiscv.h>
 #include <uriscv/cpu.h>
+#include <uriscv/types.h>
+
 #include "./headers/scheduler.h"
 
 #include "../headers/listx.h"
@@ -25,7 +27,7 @@ static void createProcess(state_t* processorState);
 static void terminateProcess(state_t* processorState);
 static void passren(state_t* processorState);
 static void verhogen(state_t* processorState);
-
+static void doIO(state_t* processorState);
 
 void exceptionHandler() {
     unsigned int cause = getCAUSE();
@@ -67,10 +69,13 @@ void syscallExceptionHandler(state_t* processorState) {
             terminateProcess(processorState);
             break;
         case PASSEREN:
-            passren(processorState);
+            passeren(processorState);
             break;
         case VERHOGEN:
             verhogen(processorState);
+            break;
+        case DOIO:
+            doIO(processorState);
             break;
     }
 }
@@ -188,7 +193,6 @@ static void terminateProcess(state_t* processorState) {
     if (toTerminate) {
         outChild(toTerminate);
         terminatedCurrent = recursiveTermination(toTerminate);
-       
     }
 
     if (!terminatedCurrent) {
@@ -198,24 +202,31 @@ static void terminateProcess(state_t* processorState) {
     
         insertProcQ(&readyQueue, currentProcess);
     }
+    else {
+        currentProcess = NULL;
+    }
 
     scheduler();
 }
 
-static void passren(state_t* processorState) {
-    int* semadrr = (int*)processorState->reg_a1;
-    (*semadrr)--;
-
-    processorState->pc_epc += 4;
-
-    if (*semadrr < 0) {
+static void pOnSem(int* semAddr, state_t* processorState) {
+    (*semAddr)--;
+    if (*semAddr < 0) {
         updateProcessState(processorState, currentProcess);
-        insertBlocked(semadrr, currentProcess);
+        insertBlocked(semAddr, currentProcess);
+
+        currentProcess = NULL;
         scheduler();
     }
-    else {
-        LDST(processorState);
-    }
+}
+
+static void passeren(state_t* processorState) {
+    int* semAdrr = (int*)processorState->reg_a1;
+    processorState->pc_epc += 4;
+    
+    pOnSem(semAdrr, processorState);
+
+    LDST(processorState);
 }
 
 static void verhogen(state_t* processorState) {
@@ -232,6 +243,58 @@ static void verhogen(state_t* processorState) {
     LDST(processorState);
 }
 
+static unsigned int mapDeviceSemaphore(unsigned int addr) {
+    /*** 
+     * Index 0-7: intlineNo 3
+     * Index 8-15: intlineNo 4
+     * Index 16-23: intlineNo 5
+     * Index 24-31: intlineNo 6
+     * Index 32-39: intlineNo 7 - tx
+     * Index 40-47: intlineNo 7 - rx
+     * Index 48: intlineNo 2
+     * 
+     * La mappatura rispetta ordine di priorita', piu' basso e' piu' e' prioritario apparte per Interval timer per facilitare la gestione
+     * e una maggiore chiarezza nella mappatura, altrimenti basterebbe fare shift tutto di 1 e mettere index 0 per Interval timer.
+     * 
+     * Interval timer non ha un registro gestito con offset, quindi tale funzione non puo' fornire la mappatura per essa.
+     */
+
+    // Ci sono calcoli ridondanti come il +3 messo per IntlineNo, lo si ha lasciato per maggiore chiarezza
+    unsigned int offset = addr - 0x10000054;
+    unsigned int IntlineNo = (offset / 0x80) + 3;
+    unsigned int DevNo = (offset % 0x80) / 0x10;
+
+    unsigned int isRx = 0;
+    if (IntlineNo == 7) {
+        // Controlla offset per i terminali e verifica se sia una ricezione
+        if (offset % 0x10 == 0x04)
+            isRx = 1;
+    }
+
+    // (offset per classe di dispositivo) + (offset ulteriore per i sub devices di ricezione del terminale) + DevNo
+    // DevNo va da 0 a 7
+    return ((IntlineNo - 3) * 8) + (isRx * 8) + DevNo;
+}
+
+static void doIO(state_t* processorState) {
+    // SYSCALL(DOIO, int *commandAddr, int commandValue, 0);
+    
+    // Scrivo il comando nel registro specificato
+    *(unsigned int*)(processorState->reg_a1) = processorState->reg_a2;
+
+    // Identifico quale semaforo usare
+    unsigned int semaphoreIndex = mapDeviceSemaphore(processorState->reg_a1);
+
+    processorState->pc_epc += 4;
+
+    // Faccio P sul semaforo trovato
+    pOnSem(&deviceSemaphore[semaphoreIndex], processorState);
+}
+
+
+/****
+ * DA SPOSTARE IN INTERRUPT.C
+ */
 void processorLocalTimerInt(state_t* processorState) {
     // Acknoledge interrupt e carica il nuovo valore
     setTIMER(TIMESLICE);
@@ -252,6 +315,10 @@ static void deviceInterruptHandler() {
     if (excCode == IL_CPUTIMER)
         processorLocalTimerInt(processorState);
 };
+
+/****
+ * END
+ */
 
 static void tlbExceptionHandler() {return;};
 static void programTrapExceptionHandler() {return;};
