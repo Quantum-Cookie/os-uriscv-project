@@ -104,6 +104,8 @@ static void createProcess(state_t* processorState) {
     //newPcb->p_s = *((state_t*)(processorState->reg_a1));
     copyState((state_t*)(processorState->reg_a1), &newPcb->p_s);
 
+    newPcb->p_prio = processorState->reg_a2;
+
     if (processorState->reg_a3)
         newPcb->p_supportStruct = (support_t *)processorState->reg_a3;
     else
