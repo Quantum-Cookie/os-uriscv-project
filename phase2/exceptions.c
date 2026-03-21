@@ -25,7 +25,7 @@ static void programTrapExceptionHandler();
 
 static void createProcess(state_t* processorState);
 static void terminateProcess(state_t* processorState);
-static void passren(state_t* processorState);
+static void passeren(state_t* processorState);
 static void verhogen(state_t* processorState);
 static void doIO(state_t* processorState);
 
