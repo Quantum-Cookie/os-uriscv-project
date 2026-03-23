@@ -229,21 +229,28 @@ static void passeren(state_t* processorState) {
     LDST(processorState);
 }
 
-static void verhogen(state_t* processorState) {
-    int* semadrr = (int*)processorState->reg_a1;
-    (*semadrr)++;
-
-    if (*semadrr <= 0) {
-        pcb_t* readyProc = removeBlocked(semadrr);
+static pcb_t* vOnSem(int* semAddr) {
+    (*semAddr)++;
+    pcb_t* readyProc;
+    if (*semAddr <= 0) {
+        readyProc = removeBlocked(semAddr);
         if (readyProc)
             insertProcQ(&readyQueue, readyProc);
     }
+    return readyProc;
+}
+
+static void verhogen(state_t* processorState) {
+    int* semAddr = (int*)processorState->reg_a1;
+    (*semAddr)++;
+
+    vOnSem(semAddr);
 
     processorState->pc_epc += 4;
     LDST(processorState);
 }
 
-static unsigned int mapDeviceSemaphore(unsigned int addr) {
+static unsigned int mapDeviceSemaphoreByAddr(unsigned int addr) {
     /*** 
      * Index 0-7: intlineNo 3
      * Index 8-15: intlineNo 4
@@ -260,7 +267,7 @@ static unsigned int mapDeviceSemaphore(unsigned int addr) {
      */
 
     // Ci sono calcoli ridondanti come il +3 messo per IntlineNo, lo si ha lasciato per maggiore chiarezza
-    unsigned int offset = addr - 0x10000054;
+    unsigned int offset = addr - START_DEVREG;
     unsigned int IntlineNo = (offset / 0x80) + 3;
     unsigned int DevNo = (offset % 0x80) / 0x10;
 
@@ -283,10 +290,11 @@ static void doIO(state_t* processorState) {
     *(unsigned int*)(processorState->reg_a1) = processorState->reg_a2;
 
     // Identifico quale semaforo usare
-    unsigned int semaphoreIndex = mapDeviceSemaphore(processorState->reg_a1);
+    unsigned int semaphoreIndex = mapDeviceSemaphoreByAddr(processorState->reg_a1);
 
     processorState->pc_epc += 4;
 
+    softBlockCount++;
     // Faccio P sul semaforo trovato
     pOnSem(&deviceSemaphore[semaphoreIndex], processorState);
 }
@@ -308,12 +316,73 @@ void processorLocalTimerInt(state_t* processorState) {
     scheduler();
 }
 
+void nonTimerInterrupts(unsigned int excCode, state_t* processorState) {
+    unsigned int IntlineNo = excCode - 14;
+    
+    // 1. Trova il bit del dispositivo (Priorità: bit più basso)
+    unsigned int *bitmapAddr = (unsigned int *)(0x10000040 + (IntlineNo - 3) * 0x04);
+
+    int devNo;
+    for (devNo = 0; devNo < 8 && !(*bitmapAddr & (1 << devNo)); devNo++);
+    
+    if (devNo == 8) return;
+
+    // 2. Calcola l'indirizzo base e prepara le variabili
+    memaddr devAddrBase = START_DEVREG + ((IntlineNo - 3) * 0x80) + (devNo * 0x10);
+    int semIndex = (IntlineNo - 3) * 8 + devNo;
+    unsigned int status;
+
+    if (excCode == IL_TERMINAL) { 
+        termreg_t *termReg = (termreg_t *)devAddrBase;
+        
+        if (termReg->transm_status != UNINSTALLED && termReg->transm_status != READY && termReg->transm_status != BUSY) {
+            status = termReg->transm_status;
+            termReg->transm_command = ACK; 
+        } else {
+            status = termReg->recv_status;
+            termReg->recv_command = ACK;  
+            semIndex += 8;              
+        }
+    } else { 
+        dtpreg_t *devReg = (dtpreg_t *)devAddrBase;
+        status = devReg->status;
+        devReg->command = ACK;            
+    }
+
+    pcb_t* readyProc = vOnSem(&deviceSemaphore[semIndex]);
+    readyProc->p_s.reg_a0 = status;
+
+    softBlockCount--;
+    
+    if (currentProcess) {
+        LDST(processorState);
+    }
+    else {
+        scheduler();
+    }
+}
+
+
 static void deviceInterruptHandler() {
     unsigned int excCode = GET_EXEC_CODE(getCAUSE());
 
     state_t* processorState = GET_EXCEPTION_STATE_PTR(PROCESSOR_ID);
-    if (excCode == IL_CPUTIMER)
-        processorLocalTimerInt(processorState);
+    switch (excCode)
+    {
+        case IL_CPUTIMER:
+            processorLocalTimerInt(processorState);
+            break;
+        case IL_TIMER:
+            break;
+        case IL_DISK:
+        case IL_FLASH:
+        case IL_ETHERNET:
+        case IL_PRINTER:
+        case IL_TERMINAL:
+            nonTimerInterrupts(excCode, processorState);
+        default:
+            break;
+    }        
 };
 
 /****
