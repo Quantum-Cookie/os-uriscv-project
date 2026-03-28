@@ -299,6 +299,19 @@ static void doIO(state_t* processorState) {
     pOnSem(&deviceSemaphore[semaphoreIndex], processorState);
 }
 
+//(ancora da testare)
+static void GetCPUTime(state_t* processorState){
+    //Tempo di utilizzo CPU del processo corrente accumulato durante l'esecuzione attuale 
+    cpu_t currentTime;
+    STCK(currentTime);
+    //Somma del tempo di esecuzione attuale con quello accumulato in precedenza
+    cpu_t CPUTime = currentProcess -> p_time + (currentTime - startRunningTime); 
+    //Memorizzazione del tempo di utilizzo CPU totale nel registro a0
+    processorState->reg_a0 = CPUTime;
+    //Aggiornamento del PC e ritorno all'esecuzione del chiamante
+    processorState->pc_epc += 4;
+    LDST(processorState);
+}
 
 /****
  * DA SPOSTARE IN INTERRUPT.C
