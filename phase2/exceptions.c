@@ -312,6 +312,49 @@ static void GetCPUTime(state_t* processorState){
     processorState->pc_epc += 4;
     LDST(processorState);
 }
+//(ancora da testare)
+static void WaitForClock(state_t* processorState) {
+    //Aggiornamento del PC
+    processorState->pc_epc += 4;
+    //Faccio P sul semaforo del pseudo clock
+    pOnSem(pseudoSemaphore, processorState);    
+}    
+//(ancora da testare)
+static support_t* GetSupportData(state_t* processorState) {
+    if (currentProcess->p_supportStruct) {
+        return currentProcess->p_supportStruct;
+    }
+    else {
+        return NULL;
+    }
+    //Aggiornamento del PC
+    processorState->pc_epc += 4;
+    LDST(processorState);
+}
+//(ancora da testare)
+static void GetProcessID(state_t* processorState) {
+    if(currentProcess->p_parent){
+        processorState->reg_a0 = currentProcess->p_parent->p_pid;
+    }
+    else {
+        processorState->reg_a0 = currentProcess->p_pid;
+    }
+    //Aggiornamento del PC
+    processorState->pc_epc += 4;
+    LDST(processorState);
+}
+//(ancora da testare)
+static void Yield (state_t* processorState){
+    //Aggiornamento del PC
+    processorState->pc_epc += 4;
+    //Salvo lo stato del processo corrente
+    updateProcessState(processorState, currentProcess);
+    //Inserisco il processo corrente alla fine della ReadyQueue
+    insertProcQ(&readyQueue, currentProcess);
+    //Faccio partire lo scheduler
+    currentProcess = NULL;
+    scheduler();
+}
 
 /****
  * DA SPOSTARE IN INTERRUPT.C
