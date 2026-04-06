@@ -17,6 +17,7 @@ int softBlockCount;
 struct list_head readyQueue;
 pcb_t* currentProcess;
 int deviceSemaphore[NRSEMAPHORES];
+int pseudoClockSem = 0;
 
 pcb_t* rootProcess;
 cpu_t startRunningTime;
