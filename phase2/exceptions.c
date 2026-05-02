@@ -242,7 +242,6 @@ static pcb_t* vOnSem(int* semAddr) {
 
 static void verhogen(state_t* processorState) {
     int* semAddr = (int*)processorState->reg_a1;
-    (*semAddr)++;
 
     vOnSem(semAddr);
 
