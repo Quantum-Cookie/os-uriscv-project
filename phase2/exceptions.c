@@ -197,7 +197,11 @@ static int recursiveTermination(pcb_t* toTerminate) {
 
     if (toTerminate->p_semAdd) {
         outBlocked(toTerminate);
-        softBlockCount--;
+        // Decrementa softBlockCount solo se bloccato su device/pseudoclock
+        int semIndex = toTerminate->p_semAdd - &deviceSemaphore[0];
+        if (semIndex >= 0 && semIndex < NRSEMAPHORES) {
+            softBlockCount--;
+        }
     } else if (toTerminate != currentProcess) {
         outProcQ(&readyQueue, toTerminate);
     }
@@ -462,7 +466,9 @@ void nonTimerInterrupts(unsigned int excCode, state_t* processorState) {
     }
 
     pcb_t* readyProc = vOnSem(&deviceSemaphore[semIndex]);
-    readyProc->p_s.reg_a0 = status;
+    if (readyProc) {
+        readyProc->p_s.reg_a0 = status;
+    }
 
     /*STCK(actTime);
     readyProc->p_time += actTime - startRunningTime;*/
@@ -516,6 +522,7 @@ static void deviceInterruptHandler() {
         case IL_PRINTER:
         case IL_TERMINAL:
             nonTimerInterrupts(excCode, processorState);
+            break;
         default:
             break;
     }        
