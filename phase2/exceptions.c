@@ -249,7 +249,6 @@ static void pOnSem(int* semAddr, state_t* processorState) {
         updateProcessState(processorState, currentProcess);
         insertBlocked(semAddr, currentProcess);
 
-        softBlockCount++;
         currentProcess = NULL;
     }
 }
@@ -277,7 +276,6 @@ static pcb_t* vOnSem(int* semAddr) {
         if (readyProc)
             insertProcQ(&readyQueue, readyProc);
 
-        softBlockCount--;
     }
     return readyProc;
 }
@@ -337,6 +335,7 @@ static void doIO(state_t* processorState) {
 
     // Faccio P sul semaforo trovato
     pOnSem(&deviceSemaphore[semaphoreIndex], processorState);
+    if (currentProcess == NULL) softBlockCount++;
     scheduler();
 }
 
@@ -359,6 +358,7 @@ static void WaitForClock(state_t* processorState) {
     processorState->pc_epc += 4;
     //Faccio P sul semaforo del pseudo clock
     pOnSem(&deviceSemaphore[PSEUDO_SEMAPHORE_INDEX], processorState);    
+    if (currentProcess == NULL) softBlockCount++;
     scheduler();
 }    
 //(ancora da testare)
@@ -468,10 +468,8 @@ void nonTimerInterrupts(unsigned int excCode, state_t* processorState) {
     pcb_t* readyProc = vOnSem(&deviceSemaphore[semIndex]);
     if (readyProc) {
         readyProc->p_s.reg_a0 = status;
+        softBlockCount--;  // era bloccato su device
     }
-
-    /*STCK(actTime);
-    readyProc->p_time += actTime - startRunningTime;*/
     
     if (currentProcess) {
         STCK(startRunningTime);
@@ -495,6 +493,7 @@ void intervalTimer(state_t* processorState) {
     // Sblocca tutti i processi in attesa del pseudo-clock (V fino a 0)
     while (deviceSemaphore[PSEUDO_SEMAPHORE_INDEX] < 0) {
         vOnSem(&deviceSemaphore[PSEUDO_SEMAPHORE_INDEX]);
+        softBlockCount--;
     }
     if (currentProcess) {
         STCK(startRunningTime);
