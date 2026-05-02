@@ -6,19 +6,19 @@
 
 void scheduler() {
     // Estrae processo da eseguire nella Ready Queue
-    pcb_t* runningProcess = removeProcQ(&readyQueue);
+    pcb_t* processToRun = removeProcQ(&readyQueue);
 
-    if (runningProcess) {
-        currentProcess = runningProcess;
-
-        // Imposta 5ms il PLT, ovvero il time slice dedicato
-        setTIMER(TIMESLICE);
+    if (processToRun) {
+        currentProcess = processToRun;
 
         // Memorizza il tempo in cui e' iniziato l'esecuzione
         STCK(startRunningTime);
 
+        // Imposta 5ms il PLT, ovvero il time slice dedicato
+        setTIMER(TIMESLICE);
+
         // Ripristina lo stato del processore per il processo
-        LDST(&runningProcess->p_s);
+        LDST(&processToRun->p_s);
     }
     else {
         // Non ci sono piu' processi
