@@ -80,8 +80,7 @@ int sem_term_mut = 1,              /* for mutual exclusion on terminal */
     sem_endp8               = 0,   /* to signal demise of p8 */
     sem_endcreate[NOLEAVES] = {0}, /* for a p8 leaf to signal its creation */
     sem_blkp8               = 0,   /* to block p8 */
-    sem_blkp9               = 0,   /* to block p9 */
-    sem_testbinary          = 0;   /* to test binary semaphores */
+    sem_blkp9               = 0;   /* to block p9 */
 
 state_t p2state, p3state, p4state, p5state, p6state, p7state, p8rootstate, child1state, child2state, gchild1state,
     gchild2state, gchild3state, gchild4state, p9state, p10state, hp_p1state, hp_p2state;
@@ -169,103 +168,103 @@ void test() {
     STST(&hp_p1state);
     hp_p1state.reg_sp = hp_p1state.reg_sp - QPAGE;
     hp_p1state.pc_epc = (memaddr)hp_p1;
-    hp_p1state.status |= MSTATUS_MIE_MASK | MSTATUS_MPP_M;
+    hp_p1state.status |= MSTATUS_MPIE_MASK | MSTATUS_MPP_M;
     hp_p1state.mie = MIE_ALL;
 
     STST(&hp_p2state);
     hp_p2state.reg_sp = hp_p1state.reg_sp - QPAGE;
     hp_p2state.pc_epc = (memaddr)hp_p2;
-    hp_p2state.status |= MSTATUS_MIE_MASK | MSTATUS_MPP_M;
+    hp_p2state.status |= MSTATUS_MPIE_MASK | MSTATUS_MPP_M;
     hp_p2state.mie = MIE_ALL;
 
     STST(&p2state);
     p2state.reg_sp = hp_p2state.reg_sp - QPAGE;
     p2state.pc_epc = (memaddr)p2;
-    p2state.status |= MSTATUS_MIE_MASK | MSTATUS_MPP_M;
+    p2state.status |= MSTATUS_MPIE_MASK | MSTATUS_MPP_M;
     p2state.mie = MIE_ALL;
 
     STST(&p3state);
     p3state.reg_sp = p2state.reg_sp - QPAGE;
     p3state.pc_epc = (memaddr)p3;
-    p3state.status |= MSTATUS_MIE_MASK | MSTATUS_MPP_M;
+    p3state.status |= MSTATUS_MPIE_MASK | MSTATUS_MPP_M;
     p3state.mie = MIE_ALL;
 
     STST(&p4state);
     p4state.reg_sp = p3state.reg_sp - QPAGE;
     p4state.pc_epc = (memaddr)p4;
-    p4state.status |= MSTATUS_MIE_MASK | MSTATUS_MPP_M;
+    p4state.status |= MSTATUS_MPIE_MASK | MSTATUS_MPP_M;
     p4state.mie = MIE_ALL;
 
     STST(&p5state);
     p5Stack = p5state.reg_sp = p4state.reg_sp - (2 * QPAGE); /* because there will 2 p4 running*/
     p5state.pc_epc = (memaddr)p5;
-    p5state.status |= MSTATUS_MIE_MASK | MSTATUS_MPP_M;
+    p5state.status |= MSTATUS_MPIE_MASK | MSTATUS_MPP_M;
     p5state.mie = MIE_ALL;
 
     STST(&p6state);
     p6state.reg_sp = p5state.reg_sp - (2 * QPAGE);
     p6state.pc_epc = (memaddr)p6;
-    p6state.status |= MSTATUS_MIE_MASK | MSTATUS_MPP_M;
+    p6state.status |= MSTATUS_MPIE_MASK | MSTATUS_MPP_M;
     p6state.mie = MIE_ALL;
 
     STST(&p7state);
     p7state.reg_sp = p6state.reg_sp - QPAGE;
     p7state.pc_epc = (memaddr)p7;
-    p7state.status |= MSTATUS_MIE_MASK | MSTATUS_MPP_M;
+    p7state.status |= MSTATUS_MPIE_MASK | MSTATUS_MPP_M;
     p7state.mie = MIE_ALL;
 
     STST(&p8rootstate);
     p8rootstate.reg_sp = p7state.reg_sp - QPAGE;
     p8rootstate.pc_epc = (memaddr)p8root;
-    p8rootstate.status |= MSTATUS_MIE_MASK | MSTATUS_MPP_M;
+    p8rootstate.status |= MSTATUS_MPIE_MASK | MSTATUS_MPP_M;
     p8rootstate.mie = MIE_ALL;
 
     STST(&child1state);
     child1state.reg_sp = p8rootstate.reg_sp - QPAGE;
     child1state.pc_epc = (memaddr)child1;
-    child1state.status |= MSTATUS_MIE_MASK | MSTATUS_MPP_M;
+    child1state.status |= MSTATUS_MPIE_MASK | MSTATUS_MPP_M;
     child1state.mie = MIE_ALL;
 
     STST(&child2state);
     child2state.reg_sp = child1state.reg_sp - QPAGE;
     child2state.pc_epc = (memaddr)child2;
-    child2state.status |= MSTATUS_MIE_MASK | MSTATUS_MPP_M;
+    child2state.status |= MSTATUS_MPIE_MASK | MSTATUS_MPP_M;
     child2state.mie = MIE_ALL;
 
     STST(&gchild1state);
     gchild1state.reg_sp = child2state.reg_sp - QPAGE;
     gchild1state.pc_epc = (memaddr)p8leaf1;
-    gchild1state.status |= MSTATUS_MIE_MASK | MSTATUS_MPP_M;
+    gchild1state.status |= MSTATUS_MPIE_MASK | MSTATUS_MPP_M;
     gchild1state.mie = MIE_ALL;
 
     STST(&gchild2state);
     gchild2state.reg_sp = gchild1state.reg_sp - QPAGE;
     gchild2state.pc_epc = (memaddr)p8leaf2;
-    gchild2state.status |= MSTATUS_MIE_MASK | MSTATUS_MPP_M;
+    gchild2state.status |= MSTATUS_MPIE_MASK | MSTATUS_MPP_M;
     gchild2state.mie = MIE_ALL;
 
     STST(&gchild3state);
     gchild3state.reg_sp = gchild2state.reg_sp - QPAGE;
     gchild3state.pc_epc = (memaddr)p8leaf3;
-    gchild3state.status |= MSTATUS_MIE_MASK | MSTATUS_MPP_M;
+    gchild3state.status |= MSTATUS_MPIE_MASK | MSTATUS_MPP_M;
     gchild3state.mie = MIE_ALL;
 
     STST(&gchild4state);
     gchild4state.reg_sp = gchild3state.reg_sp - QPAGE;
     gchild4state.pc_epc = (memaddr)p8leaf4;
-    gchild4state.status |= MSTATUS_MIE_MASK | MSTATUS_MPP_M;
+    gchild4state.status |= MSTATUS_MPIE_MASK | MSTATUS_MPP_M;
     gchild4state.mie = MIE_ALL;
 
     STST(&p9state);
     p9state.reg_sp = gchild4state.reg_sp - QPAGE;
     p9state.pc_epc = (memaddr)p9;
-    p9state.status |= MSTATUS_MIE_MASK | MSTATUS_MPP_M;
+    p9state.status |= MSTATUS_MPIE_MASK | MSTATUS_MPP_M;
     p9state.mie = MIE_ALL;
 
     STST(&p10state);
     p10state.reg_sp = p9state.reg_sp - QPAGE;
     p10state.pc_epc = (memaddr)p10;
-    p10state.status |= MSTATUS_MIE_MASK | MSTATUS_MPP_M;
+    p10state.status |= MSTATUS_MPIE_MASK | MSTATUS_MPP_M;
     p10state.mie = MIE_ALL;
 
       /* create process p2 */
@@ -294,10 +293,10 @@ void test() {
     p4pid = SYSCALL(CREATEPROCESS, (int)&p4state, PROCESS_PRIO_LOW, (int)NULL); /* start p4     */
 
     pFiveSupport.sup_exceptContext[GENERALEXCEPT].stackPtr = (int)p5Stack;
-    pFiveSupport.sup_exceptContext[GENERALEXCEPT].status |= MSTATUS_MIE_MASK | MSTATUS_MPP_M;
+    pFiveSupport.sup_exceptContext[GENERALEXCEPT].status |= MSTATUS_MPIE_MASK | MSTATUS_MPP_M;
     pFiveSupport.sup_exceptContext[GENERALEXCEPT].pc = (memaddr)p5gen;
     pFiveSupport.sup_exceptContext[PGFAULTEXCEPT].stackPtr = p5Stack;
-    pFiveSupport.sup_exceptContext[PGFAULTEXCEPT].status |= MSTATUS_MIE_MASK | MSTATUS_MPP_M;
+    pFiveSupport.sup_exceptContext[PGFAULTEXCEPT].status |= MSTATUS_MPIE_MASK | MSTATUS_MPP_M;
     pFiveSupport.sup_exceptContext[PGFAULTEXCEPT].pc = (memaddr)p5mm;
 
     SYSCALL(CREATEPROCESS, (int)&p5state, PROCESS_PRIO_LOW, (int)&(pFiveSupport)); /* start p5     */
@@ -694,7 +693,6 @@ void child2() {
 /*p8leaf -- code for leaf processes*/
 
 void p8leaf1() {
-    SYSCALL(VERHOGEN, (int)&sem_testbinary, 0, 0);
     print("leaf process (1) starts\n");
     SYSCALL(VERHOGEN, (int)&sem_endcreate[0], 0, 0);
     SYSCALL(PASSEREN, (int)&sem_blkp8, 0, 0);
@@ -702,7 +700,6 @@ void p8leaf1() {
 
 
 void p8leaf2() {
-    SYSCALL(VERHOGEN, (int)&sem_testbinary, 0, 0);
     print("leaf process (2) starts\n");
     SYSCALL(VERHOGEN, (int)&sem_endcreate[1], 0, 0);
     SYSCALL(PASSEREN, (int)&sem_blkp8, 0, 0);
@@ -712,12 +709,6 @@ void p8leaf2() {
 void p8leaf3() {
     print("leaf process (3) starts\n");
     SYSCALL(VERHOGEN, (int)&sem_endcreate[2], 0, 0);
-    if (sem_testbinary != 1) {
-        print("Error: binary semaphore value is not 1!\n");
-        PANIC();
-    }
-    SYSCALL(PASSEREN, (int)&sem_testbinary, 0, 0);
-    SYSCALL(PASSEREN, (int)&sem_testbinary, 0, 0);
     SYSCALL(PASSEREN, (int)&sem_blkp8, 0, 0);
 }
 
