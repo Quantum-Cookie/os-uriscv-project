@@ -19,9 +19,11 @@
 #define PROCESSOR_ID 0
 
 static void deviceInterruptHandler();
-static void tlbExceptionHandler();
 static void syscallExceptionHandler(state_t* processorState);
+
+static void passUpOrDie(state_t* processorState, unsigned int index);
 static void programTrapExceptionHandler();
+static void tlbExceptionHandler();
 
 static void createProcess(state_t* processorState);
 static void terminateProcess(state_t* processorState);
@@ -42,21 +44,21 @@ void exceptionHandler() {
         deviceInterruptHandler();
     }
     else {
+        state_t* processorState = GET_EXCEPTION_STATE_PTR(PROCESSOR_ID);
         switch (GET_EXEC_CODE(cause)) {
             case 24 ... 28:
-                tlbExceptionHandler();
+                passUpOrDie(processorState, PGFAULTEXCEPT);
                 break;
 
             case 8:
             case 11:
-                state_t* processorState = GET_EXCEPTION_STATE_PTR(PROCESSOR_ID);
                 syscallExceptionHandler(processorState);
                 break;
 
             case 0 ... 7:
             case 9 ... 10:
             case 12 ... 23:
-                programTrapExceptionHandler();
+                passUpOrDie(processorState, GENERALEXCEPT);
                 break;
 
             default:
@@ -65,8 +67,10 @@ void exceptionHandler() {
     }
 }
 
+
 void syscallExceptionHandler(state_t* processorState) {
-    switch (processorState->reg_a0) {
+    int a0 = processorState->reg_a0;
+    switch (a0) {
         case CREATEPROCESS:
             createProcess(processorState);
             break;
@@ -96,6 +100,12 @@ void syscallExceptionHandler(state_t* processorState) {
             break;
         case YIELD:
             Yield(processorState);
+            break;
+        default:
+            if (a0 >= 1) {
+                processorState->pc_epc += 4;
+                passUpOrDie(processorState, GENERALEXCEPT);
+            }
             break;
     }
 }
@@ -514,6 +524,24 @@ static void deviceInterruptHandler() {
 /****
  * END
  */
+
+
+static void passUpOrDie(state_t* processorState, unsigned int index) {
+    // Se il puntatore p_supportStruct e' nullo termina il processo e tutti i suoi progeniti
+    if (!currentProcess->p_supportStruct) {
+        outChild(currentProcess);
+        recursiveTermination(currentProcess);
+        currentProcess = NULL;
+
+        scheduler();
+    }
+    else {
+        copyState(processorState, &(currentProcess->p_supportStruct->sup_exceptState[index]));
+        LDCXT(currentProcess->p_supportStruct->sup_exceptContext[index].stackPtr, 
+            currentProcess->p_supportStruct->sup_exceptContext[index].status, 
+            currentProcess->p_supportStruct->sup_exceptContext[index].pc);
+    }
+}
 
 static void tlbExceptionHandler() {return;};
 static void programTrapExceptionHandler() {return;};
