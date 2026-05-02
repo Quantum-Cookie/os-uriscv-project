@@ -28,6 +28,11 @@ static void terminateProcess(state_t* processorState);
 static void passeren(state_t* processorState);
 static void verhogen(state_t* processorState);
 static void doIO(state_t* processorState);
+static void GetCPUTime(state_t* processorState);
+static void WaitForClock(state_t* processorState);
+static support_t* GetSupportData(state_t* processorState);
+static void GetProcessID(state_t* processorState);
+static void Yield (state_t* processorState);
 
 void exceptionHandler() {
     unsigned int cause = getCAUSE();
