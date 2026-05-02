@@ -30,7 +30,7 @@ static void verhogen(state_t* processorState);
 static void doIO(state_t* processorState);
 static void GetCPUTime(state_t* processorState);
 static void WaitForClock(state_t* processorState);
-static support_t* GetSupportData(state_t* processorState);
+static void GetSupportData(state_t* processorState);
 static void GetProcessID(state_t* processorState);
 static void Yield (state_t* processorState);
 
@@ -321,7 +321,6 @@ static void doIO(state_t* processorState) {
 
     processorState->pc_epc += 4;
 
-    softBlockCount++;
     // Faccio P sul semaforo trovato
     pOnSem(&deviceSemaphore[semaphoreIndex], processorState);
     scheduler();
@@ -349,14 +348,12 @@ static void WaitForClock(state_t* processorState) {
     scheduler();
 }    
 //(ancora da testare)
-static support_t* GetSupportData(state_t* processorState) {
+static void GetSupportData(state_t* processorState) {
     if (currentProcess->p_supportStruct) {
-        return currentProcess->p_supportStruct;
+        processorState->reg_a0 = (int)currentProcess->p_supportStruct;
+    } else {
+        processorState->reg_a0 = (int)NULL;
     }
-    else {
-        return NULL;
-    }
-    //Aggiornamento del PC
     processorState->pc_epc += 4;
     LDST(processorState);
 }
@@ -447,8 +444,6 @@ void nonTimerInterrupts(unsigned int excCode, state_t* processorState) {
 
     pcb_t* readyProc = vOnSem(&deviceSemaphore[semIndex]);
     readyProc->p_s.reg_a0 = status;
-
-    softBlockCount--;
     
     if (currentProcess) {
         LDST(processorState);
@@ -458,6 +453,19 @@ void nonTimerInterrupts(unsigned int excCode, state_t* processorState) {
     }
 }
 
+void intervalTimer(state_t* processorState) {
+    // Ricarica l'interval timer
+    LDIT(PSECOND);
+    // Sblocca tutti i processi in attesa del pseudo-clock (V fino a 0)
+    while (deviceSemaphore[PSEUDO_SEMAPHORE_INDEX] < 0) {
+        pcb_t* proc = vOnSem(&deviceSemaphore[PSEUDO_SEMAPHORE_INDEX]);
+        if (proc) proc->p_s.reg_a0 = 0;
+    }
+    if (currentProcess)
+        LDST(processorState);
+    else
+        scheduler();
+}
 
 static void deviceInterruptHandler() {
     unsigned int excCode = GET_EXEC_CODE(getCAUSE());
@@ -469,6 +477,7 @@ static void deviceInterruptHandler() {
             processorLocalTimerInt(processorState);
             break;
         case IL_TIMER:
+            intervalTimer(processorState);
             break;
         case IL_DISK:
         case IL_FLASH:
