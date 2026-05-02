@@ -235,6 +235,7 @@ static void pOnSem(int* semAddr, state_t* processorState) {
         updateProcessState(processorState, currentProcess);
         insertBlocked(semAddr, currentProcess);
 
+        softBlockCount++;
         currentProcess = NULL;
         scheduler();
     }
@@ -256,6 +257,8 @@ static pcb_t* vOnSem(int* semAddr) {
         readyProc = removeBlocked(semAddr);
         if (readyProc)
             insertProcQ(&readyQueue, readyProc);
+
+        softBlockCount--;
     }
     return readyProc;
 }
@@ -350,18 +353,29 @@ static support_t* GetSupportData(state_t* processorState) {
     processorState->pc_epc += 4;
     LDST(processorState);
 }
+
 //(ancora da testare)
 static void GetProcessID(state_t* processorState) {
-    if(currentProcess->p_parent){
-        processorState->reg_a0 = currentProcess->p_parent->p_pid;
-    }
-    else {
+    // Controlla il parametro nel registro a1
+    if (processorState->reg_a1 == 0) {
+        // Restituisce il PID del processo chiamante
         processorState->reg_a0 = currentProcess->p_pid;
+    } else {
+        // Gestione per prevenire crash se il padre è NULL (es. root process)
+        if (currentProcess->p_parent != NULL) {
+            processorState->reg_a0 = currentProcess->p_parent->p_pid;
+        } else {
+            processorState->reg_a0 = 0; // Il genitore della radice è 0
+        }
     }
-    //Aggiornamento del PC
+    
+    // Incremento del PC per evitare il loop della SYSCALL
     processorState->pc_epc += 4;
+    
+    // Ripristina lo stato del processore
     LDST(processorState);
 }
+
 //(ancora da testare)
 static void Yield (state_t* processorState){
     //Aggiornamento del PC
