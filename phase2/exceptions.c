@@ -257,7 +257,7 @@ static void passeren(state_t* processorState) {
 
 static pcb_t* vOnSem(int* semAddr) {
     (*semAddr)++;
-    pcb_t* readyProc;
+    pcb_t* readyProc = NULL;
     if (*semAddr <= 0) {
         readyProc = removeBlocked(semAddr);
         if (readyProc)
@@ -406,10 +406,19 @@ void processorLocalTimerInt(state_t* processorState) {
     // Inserisce il processo nella Ready Queue
     insertProcQ(&readyQueue, currentProcess);
 
+    currentProcess = NULL;
+
     scheduler();
 }
 
 void nonTimerInterrupts(unsigned int excCode, state_t* processorState) {
+    if (currentProcess) {
+        cpu_t actTime;
+        STCK(actTime);
+        currentProcess->p_time += actTime - startRunningTime;
+    }
+
+    //STCK(startRunningTime);
     unsigned int IntlineNo = excCode - 14;
     
     // 1. Trova il bit del dispositivo (Priorità: bit più basso)
@@ -444,8 +453,12 @@ void nonTimerInterrupts(unsigned int excCode, state_t* processorState) {
 
     pcb_t* readyProc = vOnSem(&deviceSemaphore[semIndex]);
     readyProc->p_s.reg_a0 = status;
+
+    /*STCK(actTime);
+    readyProc->p_time += actTime - startRunningTime;*/
     
     if (currentProcess) {
+        STCK(startRunningTime);
         LDST(processorState);
     }
     else {
@@ -456,13 +469,21 @@ void nonTimerInterrupts(unsigned int excCode, state_t* processorState) {
 void intervalTimer(state_t* processorState) {
     // Ricarica l'interval timer
     LDIT(PSECOND);
+
+    if (currentProcess) {
+        cpu_t actTime;
+        STCK(actTime);
+        currentProcess->p_time += actTime - startRunningTime;
+    }
+
     // Sblocca tutti i processi in attesa del pseudo-clock (V fino a 0)
     while (deviceSemaphore[PSEUDO_SEMAPHORE_INDEX] < 0) {
-        pcb_t* proc = vOnSem(&deviceSemaphore[PSEUDO_SEMAPHORE_INDEX]);
-        if (proc) proc->p_s.reg_a0 = 0;
+        vOnSem(&deviceSemaphore[PSEUDO_SEMAPHORE_INDEX]);
     }
-    if (currentProcess)
+    if (currentProcess) {
+        STCK(startRunningTime);
         LDST(processorState);
+    }
     else
         scheduler();
 }

@@ -126,9 +126,6 @@ pcb_t *outBlocked(pcb_t *p)
             return p;
         }
 
-        // interruzione dell'iterazione se si supera il semaforo cercato
-        if (temp->s_key > p->p_semAdd)
-            break;
     }
 
     return NULL;
