@@ -237,7 +237,6 @@ static void pOnSem(int* semAddr, state_t* processorState) {
 
         softBlockCount++;
         currentProcess = NULL;
-        scheduler();
     }
 }
 
@@ -247,7 +246,13 @@ static void passeren(state_t* processorState) {
     
     pOnSem(semAdrr, processorState);
 
-    LDST(processorState);
+    // Se il processo si è bloccato, currentProcess è NULL e dobbiamo chiamare lo scheduler.
+    // Se non si è bloccato, eseguiamo LDST.
+    if (currentProcess == NULL) {
+        scheduler();
+    } else {
+        LDST(processorState);
+    }
 }
 
 static pcb_t* vOnSem(int* semAddr) {
@@ -319,6 +324,7 @@ static void doIO(state_t* processorState) {
     softBlockCount++;
     // Faccio P sul semaforo trovato
     pOnSem(&deviceSemaphore[semaphoreIndex], processorState);
+    scheduler();
 }
 
 //(ancora da testare)
@@ -340,6 +346,7 @@ static void WaitForClock(state_t* processorState) {
     processorState->pc_epc += 4;
     //Faccio P sul semaforo del pseudo clock
     pOnSem(&deviceSemaphore[PSEUDO_SEMAPHORE_INDEX], processorState);    
+    scheduler();
 }    
 //(ancora da testare)
 static support_t* GetSupportData(state_t* processorState) {
