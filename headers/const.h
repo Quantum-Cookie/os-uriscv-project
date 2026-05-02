@@ -239,5 +239,10 @@
 #define IRT_NUM_ENTRY 48
 /* Task Priority Register */
 #define TPR 0x10000408 
+
+
+
+
+#define PSEUDO_SEMAPHORE_INDEX 48
 #endif
 

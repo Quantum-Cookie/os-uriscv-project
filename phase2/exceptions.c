@@ -77,6 +77,21 @@ void syscallExceptionHandler(state_t* processorState) {
         case DOIO:
             doIO(processorState);
             break;
+        case GETTIME:
+            GetCPUTime(processorState);
+            break;
+        case CLOCKWAIT:
+            WaitForClock(processorState);
+            break;
+        case GETSUPPORTPTR:
+            GetSupportData(processorState);
+            break;
+        case GETPROCESSID:
+            GetProcessID(processorState);
+            break;
+        case YIELD:
+            Yield(processorState);
+            break;
     }
 }
 
@@ -316,7 +331,7 @@ static void WaitForClock(state_t* processorState) {
     //Aggiornamento del PC
     processorState->pc_epc += 4;
     //Faccio P sul semaforo del pseudo clock
-    pOnSem(pseudoSemaphore, processorState);    
+    pOnSem(&deviceSemaphore[PSEUDO_SEMAPHORE_INDEX], processorState);    
 }    
 //(ancora da testare)
 static support_t* GetSupportData(state_t* processorState) {
