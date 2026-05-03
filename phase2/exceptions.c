@@ -22,8 +22,6 @@ static void deviceInterruptHandler();
 static void syscallExceptionHandler(state_t* processorState);
 
 static void passUpOrDie(state_t* processorState, unsigned int index);
-static void programTrapExceptionHandler();
-static void tlbExceptionHandler();
 
 static void createProcess(state_t* processorState);
 static void terminateProcess(state_t* processorState);
@@ -415,8 +413,23 @@ static void Yield (state_t* processorState){
     processorState->pc_epc += 4;
     //Salvo lo stato del processo corrente
     updateProcessState(processorState, currentProcess);
-    //Inserisco il processo corrente alla fine della ReadyQueue
-    insertProcQ(&readyQueue, currentProcess);
+
+    if (!emptyProcQ(&readyQueue)) {
+        // Estraiamo il processo in cima (quello che dovrebbe essere eseguito ora)
+        pcb_t *nextToRun = removeProcQ(&readyQueue);
+        
+        // Inseriamo il processo corrente rispettando la sua priorità.
+        // Se è a priorità altissima, tornerà in cima alla readyQueue (dietro ad altri di pari livello).
+        insertProcQ(&readyQueue, currentProcess);
+        
+        // Rimettiamo il processo 'nextToRun' esattamente in TESTA alla lista,
+        // garantendo che sia LUI ad essere scelto dallo scheduler tra un istante.
+        list_add(&(nextToRun->p_list), &readyQueue);
+    } else {
+        // Se è l'unico processo nel sistema, riparte lui come da specifica
+        insertProcQ(&readyQueue, currentProcess);
+    }
+    
     //Faccio partire lo scheduler
     currentProcess = NULL;
     scheduler();
@@ -563,6 +576,3 @@ static void passUpOrDie(state_t* processorState, unsigned int index) {
             currentProcess->p_supportStruct->sup_exceptContext[index].pc);
     }
 }
-
-static void tlbExceptionHandler() {return;};
-static void programTrapExceptionHandler() {return;};
