@@ -70,43 +70,57 @@ void exceptionHandler() {
 
 void syscallExceptionHandler(state_t* processorState) {
     int a0 = processorState->reg_a0;
-    switch (a0) {
-        case CREATEPROCESS:
-            createProcess(processorState);
-            break;
-        case TERMPROCESS:
-            terminateProcess(processorState);
-            break;
-        case PASSEREN:
-            passeren(processorState);
-            break;
-        case VERHOGEN:
-            verhogen(processorState);
-            break;
-        case DOIO:
-            doIO(processorState);
-            break;
-        case GETTIME:
-            GetCPUTime(processorState);
-            break;
-        case CLOCKWAIT:
-            WaitForClock(processorState);
-            break;
-        case GETSUPPORTPTR:
-            GetSupportData(processorState);
-            break;
-        case GETPROCESSID:
-            GetProcessID(processorState);
-            break;
-        case YIELD:
-            Yield(processorState);
-            break;
-        default:
-            if (a0 >= 1) {
-                processorState->pc_epc += 4;
-                passUpOrDie(processorState, GENERALEXCEPT);
+    if (-10 <= a0 && a0 <= -1) {
+        // Controlla se il processo corrente e' in kernel mode
+        if (((processorState->status & MSTATUS_MPP_MASK) == MSTATUS_MPP_M)) {
+            switch (a0) {
+                case CREATEPROCESS:
+                    createProcess(processorState);
+                    break;
+                case TERMPROCESS:
+                    terminateProcess(processorState);
+                    break;
+                case PASSEREN:
+                    passeren(processorState);
+                    break;
+                case VERHOGEN:
+                    verhogen(processorState);
+                    break;
+                case DOIO:
+                    doIO(processorState);
+                    break;
+                case GETTIME:
+                    GetCPUTime(processorState);
+                    break;
+                case CLOCKWAIT:
+                    WaitForClock(processorState);
+                    break;
+                case GETSUPPORTPTR:
+                    GetSupportData(processorState);
+                    break;
+                case GETPROCESSID:
+                    GetProcessID(processorState);
+                    break;
+                case YIELD:
+                    Yield(processorState);
+                    break;
+                default:
+                    /*if (a0 >= 1) {
+                        processorState->pc_epc += 4;
+                        passUpOrDie(processorState, GENERALEXCEPT);
+                    }*/
+                    break;
             }
-            break;
+        }
+        else {
+            processorState->pc_epc += 4;
+            currentProcess->p_supportStruct->sup_exceptState[GENERALEXCEPT].cause = PRIVINSTR;
+            passUpOrDie(processorState, GENERALEXCEPT);
+        }
+    }
+    else if (a0 >= 1) {
+        processorState->pc_epc += 4;
+        passUpOrDie(processorState, GENERALEXCEPT);
     }
 }
 
@@ -196,9 +210,10 @@ static int recursiveTermination(pcb_t* toTerminate) {
     }
 
     if (toTerminate->p_semAdd) {
+        int* savedSemAdd = toTerminate->p_semAdd;  // salva PRIMA di outBlocked
         outBlocked(toTerminate);
-        // Decrementa softBlockCount solo se bloccato su device/pseudoclock
-        int semIndex = toTerminate->p_semAdd - &deviceSemaphore[0];
+        (*savedSemAdd)++;
+        int semIndex = savedSemAdd - &deviceSemaphore[0];
         if (semIndex >= 0 && semIndex < NRSEMAPHORES) {
             softBlockCount--;
         }
