@@ -14,12 +14,6 @@
 #include "initial.h"
 #include "utils.h"
 
-// Restituisce l'exception code
-//#define GET_EXEC_CODE(cause) (((cause) & CAUSE_EXCCODE_MASK))
-
-//#define PROCESSOR_ID 0
-
-//static void deviceInterruptHandler();
 static void syscallExceptionHandler(state_t* processorState);
 
 static void passUpOrDie(state_t* processorState, unsigned int index);
@@ -34,6 +28,15 @@ static void WaitForClock(state_t* processorState);
 static void GetSupportData(state_t* processorState);
 static void GetProcessID(state_t* processorState);
 static void Yield (state_t* processorState);
+
+/*
+void uTLB_RefillHandler() {
+    setENTRYHI(0x80000000);
+    setENTRYLO(0x00000000);
+    TLBWR();
+    LDST((state_t*) BIOSDATAPAGE);
+}
+*/
 
 void exceptionHandler() {
     unsigned int cause = getCAUSE();
@@ -68,6 +71,8 @@ void exceptionHandler() {
 
 
 void syscallExceptionHandler(state_t* processorState) {
+    processorState->pc_epc += 4;
+
     int a0 = processorState->reg_a0;
     if (-10 <= a0 && a0 <= -1) {
         // Controlla se il processo corrente e' in kernel mode
@@ -105,38 +110,26 @@ void syscallExceptionHandler(state_t* processorState) {
                     break;
                 default:
                     /*if (a0 >= 1) {
-                        processorState->pc_epc += 4;
+                        //processorState->pc_epc += 4;
+
                         passUpOrDie(processorState, GENERALEXCEPT);
                     }*/
                     break;
             }
         }
         else {
-            processorState->pc_epc += 4;
+            //processorState->pc_epc += 4;
+
             currentProcess->p_supportStruct->sup_exceptState[GENERALEXCEPT].cause = PRIVINSTR;
             passUpOrDie(processorState, GENERALEXCEPT);
         }
     }
     else if (a0 >= 1) {
-        processorState->pc_epc += 4;
+        //processorState->pc_epc += 4;
+
         passUpOrDie(processorState, GENERALEXCEPT);
     }
 }
-
-#if 0
-static void copyState(state_t* src, state_t* dest) {
-    dest->entry_hi = src->entry_hi;
-    dest->cause = src->cause;
-    dest->status = src->status;
-    dest->pc_epc = src->pc_epc;
-    dest->mie = src->mie;
-
-    // Copia i registri generici (GPR)
-    for (int i = 0; i < STATE_GPR_LEN; i++) {
-        dest->gpr[i] = src->gpr[i];
-    }
-}
-#endif
 
 static void createProcess(state_t* processorState) {
     pcb_t* newPcb = allocPcb();
@@ -145,7 +138,8 @@ static void createProcess(state_t* processorState) {
     if (!newPcb) {
         processorState->reg_a0 = -1;
 
-        processorState->pc_epc += 4;
+        //processorState->pc_epc += 4;
+
         LDST(processorState);
         return;
     }
@@ -169,24 +163,11 @@ static void createProcess(state_t* processorState) {
     processorState->reg_a0 = newPcb->p_pid;
 
     // Aggiorna PC e restituisce il controllo al chiamante
-    processorState->pc_epc += 4;
+    //processorState->pc_epc += 4;
+
     LDST(processorState);
 }
 
-#if 0
-/**
- * @brief Salva lo stato del processo attuale nell'apposito campo e aggiona il tempo di utilizzo CPU accumulato
- * 
- * @param processorState Puntatore allo stato del processore prima dell'eccezione
- */
-static void updateProcessState(state_t* processorState, pcb_t* process) {
-    cpu_t actTime;
-    STCK(actTime);
-
-    copyState(processorState, &process->p_s);
-    process->p_time += actTime - startRunningTime;
-}
-#endif
 
 static pcb_t* searchByPid(int pid, pcb_t* root) {
     if (root->p_pid == pid) 
@@ -248,7 +229,8 @@ static void terminateProcess(state_t* processorState) {
     }
 
     if (!terminatedCurrent) {
-        processorState->pc_epc += 4;
+        //processorState->pc_epc += 4;
+
         
         updateProcessState(processorState, currentProcess);
     
@@ -273,7 +255,8 @@ static void pOnSem(int* semAddr, state_t* processorState) {
 
 static void passeren(state_t* processorState) {
     int* semAdrr = (int*)processorState->reg_a1;
-    processorState->pc_epc += 4;
+    //processorState->pc_epc += 4;
+
     
     pOnSem(semAdrr, processorState);
 
@@ -286,26 +269,13 @@ static void passeren(state_t* processorState) {
     }
 }
 
-#if 0
-static pcb_t* vOnSem(int* semAddr) {
-    (*semAddr)++;
-    pcb_t* readyProc = NULL;
-    if (*semAddr <= 0) {
-        readyProc = removeBlocked(semAddr);
-        if (readyProc)
-            insertProcQ(&readyQueue, readyProc);
-
-    }
-    return readyProc;
-}
-#endif
-
 static void verhogen(state_t* processorState) {
     int* semAddr = (int*)processorState->reg_a1;
 
     vOnSem(semAddr);
 
-    processorState->pc_epc += 4;
+    //processorState->pc_epc += 4;
+
     LDST(processorState);
 }
 
@@ -351,7 +321,8 @@ static void doIO(state_t* processorState) {
     // Identifico quale semaforo usare
     unsigned int semaphoreIndex = mapDeviceSemaphoreByAddr(processorState->reg_a1);
 
-    processorState->pc_epc += 4;
+    //processorState->pc_epc += 4;
+
 
     // Faccio P sul semaforo trovato
     pOnSem(&deviceSemaphore[semaphoreIndex], processorState);
@@ -369,13 +340,15 @@ static void GetCPUTime(state_t* processorState){
     //Memorizzazione del tempo di utilizzo CPU totale nel registro a0
     processorState->reg_a0 = CPUTime;
     //Aggiornamento del PC e ritorno all'esecuzione del chiamante
-    processorState->pc_epc += 4;
+    //processorState->pc_epc += 4;
+
     LDST(processorState);
 }
 //(ancora da testare)
 static void WaitForClock(state_t* processorState) {
     //Aggiornamento del PC
-    processorState->pc_epc += 4;
+    //processorState->pc_epc += 4;
+
     //Faccio P sul semaforo del pseudo clock
     pOnSem(&deviceSemaphore[PSEUDO_SEMAPHORE_INDEX], processorState);    
     if (currentProcess == NULL) softBlockCount++;
@@ -388,7 +361,8 @@ static void GetSupportData(state_t* processorState) {
     } else {
         processorState->reg_a0 = (int)NULL;
     }
-    processorState->pc_epc += 4;
+    //processorState->pc_epc += 4;
+
     LDST(processorState);
 }
 
@@ -408,7 +382,8 @@ static void GetProcessID(state_t* processorState) {
     }
     
     // Incremento del PC per evitare il loop della SYSCALL
-    processorState->pc_epc += 4;
+    //processorState->pc_epc += 4;
+
     
     // Ripristina lo stato del processore
     LDST(processorState);
@@ -417,7 +392,8 @@ static void GetProcessID(state_t* processorState) {
 //(ancora da testare)
 static void Yield (state_t* processorState){
     //Aggiornamento del PC
-    processorState->pc_epc += 4;
+    //processorState->pc_epc += 4;
+
     //Salvo lo stato del processo corrente
     updateProcessState(processorState, currentProcess);
 
@@ -441,133 +417,6 @@ static void Yield (state_t* processorState){
     currentProcess = NULL;
     scheduler();
 }
-
-/****
- * DA SPOSTARE IN INTERRUPT.C
- */
-#if 0
-void processorLocalTimerInt(state_t* processorState) {
-    // Acknoledge interrupt e carica il nuovo valore
-    setTIMER(TIMESLICE);
-
-    // Salva lo stato attuale di esecuzione del processo
-    updateProcessState(processorState, currentProcess);
-
-    // Inserisce il processo nella Ready Queue
-    insertProcQ(&readyQueue, currentProcess);
-
-    currentProcess = NULL;
-
-    scheduler();
-}
-
-void nonTimerInterrupts(unsigned int excCode, state_t* processorState) {
-    if (currentProcess) {
-        cpu_t actTime;
-        STCK(actTime);
-        currentProcess->p_time += actTime - startRunningTime;
-    }
-
-    //STCK(startRunningTime);
-    unsigned int IntlineNo = excCode - 14;
-    
-    // 1. Trova il bit del dispositivo (Priorità: bit più basso)
-    unsigned int *bitmapAddr = (unsigned int *)(0x10000040 + (IntlineNo - 3) * 0x04);
-
-    int devNo;
-    for (devNo = 0; devNo < 8 && !(*bitmapAddr & (1 << devNo)); devNo++);
-    
-    if (devNo == 8) return;
-
-    // 2. Calcola l'indirizzo base e prepara le variabili
-    memaddr devAddrBase = START_DEVREG + ((IntlineNo - 3) * 0x80) + (devNo * 0x10);
-    int semIndex = (IntlineNo - 3) * 8 + devNo + 1;
-    unsigned int status;
-
-    if (excCode == IL_TERMINAL) { 
-        termreg_t *termReg = (termreg_t *)devAddrBase;
-        
-        if (termReg->transm_status != UNINSTALLED && termReg->transm_status != READY && termReg->transm_status != BUSY) {
-            status = termReg->transm_status;
-            termReg->transm_command = ACK; 
-        } else {
-            status = termReg->recv_status;
-            termReg->recv_command = ACK;  
-            semIndex += 8;              
-        }
-    } else { 
-        dtpreg_t *devReg = (dtpreg_t *)devAddrBase;
-        status = devReg->status;
-        devReg->command = ACK;            
-    }
-
-    pcb_t* readyProc = vOnSem(&deviceSemaphore[semIndex]);
-    if (readyProc) {
-        readyProc->p_s.reg_a0 = status;
-        softBlockCount--;  // era bloccato su device
-    }
-    
-    if (currentProcess) {
-        STCK(startRunningTime);
-        LDST(processorState);
-    }
-    else {
-        scheduler();
-    }
-}
-
-void intervalTimer(state_t* processorState) {
-    // Ricarica l'interval timer
-    LDIT(PSECOND);
-
-    if (currentProcess) {
-        cpu_t actTime;
-        STCK(actTime);
-        currentProcess->p_time += actTime - startRunningTime;
-    }
-
-    // Sblocca tutti i processi in attesa del pseudo-clock (V fino a 0)
-    while (deviceSemaphore[PSEUDO_SEMAPHORE_INDEX] < 0) {
-        vOnSem(&deviceSemaphore[PSEUDO_SEMAPHORE_INDEX]);
-        softBlockCount--;
-    }
-    if (currentProcess) {
-        STCK(startRunningTime);
-        LDST(processorState);
-    }
-    else
-        scheduler();
-}
-
-static void deviceInterruptHandler() {
-    unsigned int excCode = GET_EXEC_CODE(getCAUSE());
-
-    state_t* processorState = GET_EXCEPTION_STATE_PTR(PROCESSOR_ID);
-    switch (excCode)
-    {
-        case IL_CPUTIMER:
-            processorLocalTimerInt(processorState);
-            break;
-        case IL_TIMER:
-            intervalTimer(processorState);
-            break;
-        case IL_DISK:
-        case IL_FLASH:
-        case IL_ETHERNET:
-        case IL_PRINTER:
-        case IL_TERMINAL:
-            nonTimerInterrupts(excCode, processorState);
-            break;
-        default:
-            break;
-    }        
-};
-#endif
-
-/****
- * END
- */
-
 
 static void passUpOrDie(state_t* processorState, unsigned int index) {
     // Se il puntatore p_supportStruct e' nullo termina il processo e tutti i suoi progeniti
