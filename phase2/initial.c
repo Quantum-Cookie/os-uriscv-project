@@ -5,10 +5,6 @@
 #include "exceptions.h"
 #include "scheduler.h"
 
-static void initPassupvector();
-static void initNucleusData();
-static void initFirstProcess();
-
 extern void uTLB_RefillHandler();
 extern void test();
 
@@ -18,11 +14,16 @@ int softBlockCount;
 struct list_head readyQueue;
 pcb_t* currentProcess;
 int deviceSemaphore[NRSEMAPHORES];
-int pseudoClockSem = 0;
 
 pcb_t* rootProcess;
 cpu_t startRunningTime;
 
+
+/**
+ * @brief Popolazione del Processor 0 Pass Up Vector
+ * Imposta i handler, stack pointer per TLB-Refill e le Eccezioni
+ * 
+ */
 static void initPassupvector() {
     passupvector_t* passupvector = (passupvector_t *)PASSUPVECTOR;
 
@@ -35,6 +36,11 @@ static void initPassupvector() {
     passupvector->exception_stackPtr = KERNELSTACK;
 }
 
+
+/**
+ * @brief Inizializzazione delle variabili globali e configura Interval Timer
+ * 
+ */
 static void initNucleusData() {
     // Inizializzazione strutture dati di Livello 2
     initPcbs();
@@ -47,11 +53,15 @@ static void initNucleusData() {
     currentProcess = NULL;
     for(int i = 0; i < NRSEMAPHORES; i++) deviceSemaphore[i] = 0;
 
-    // Carica 100ms nel Internal Timer 
+    // Carica 100ms nel Interval Timer 
     LDIT(PSECOND);
 }
 
-static void initFirstProcess() {
+/**
+ * @brief Inizializza il primo processo
+ * 
+ */
+static void initFirstProcess(memaddr process) {
     processCount++;
 
     // allocPcb imposta gia' i campi con 0/NULL
@@ -64,17 +74,21 @@ static void initFirstProcess() {
     firstProcess->p_s.mie = MIE_ALL;
     firstProcess->p_s.status = MSTATUS_MPIE_MASK | MSTATUS_MPP_M;
 
-    // Imposta il PC del primo processo alla funzione test
-    firstProcess->p_s.pc_epc = (memaddr) test;
+    // Imposta il PC del primo processo all'indirizzo passato
+    firstProcess->p_s.pc_epc = process;
 
+    // Memorizza come il processo root
     rootProcess = firstProcess;
 
+    // Inserisce il PCB nella readyQueue
     insertProcQ(&readyQueue, firstProcess);
 }
 
+// Attualmente il primo processo e' la funzione test di p2test
 int main() {
     initPassupvector();
     initNucleusData();
-    initFirstProcess();
+    initFirstProcess((memaddr) test);
     scheduler();
+    return 0;
 }
