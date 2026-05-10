@@ -304,13 +304,13 @@ static void verhogen(state_t* processorState) {
 
 static unsigned int mapDeviceSemaphoreByAddr(unsigned int addr) {
     /*** 
-     * Index 0-7: intlineNo 3
-     * Index 8-15: intlineNo 4
-     * Index 16-23: intlineNo 5
-     * Index 24-31: intlineNo 6
-     * Index 32-39: intlineNo 7 - tx
-     * Index 40-47: intlineNo 7 - rx
-     * Index 48: intlineNo 2
+     * Index 0: intlineNo 2
+     * Index 1-8: intlineNo 3
+     * Index 9-16: intlineNo 4
+     * Index 17-24: intlineNo 5
+     * Index 25-32: intlineNo 6
+     * Index 33-40: intlineNo 7 - tx
+     * Index 41-48: intlineNo 7 - rx
      * 
      * La mappatura rispetta ordine di priorita', piu' basso e' piu' e' prioritario apparte per Interval timer per facilitare la gestione
      * e una maggiore chiarezza nella mappatura, altrimenti basterebbe fare shift tutto di 1 e mettere index 0 per Interval timer.
@@ -330,9 +330,9 @@ static unsigned int mapDeviceSemaphoreByAddr(unsigned int addr) {
             isRx = 1;
     }
 
-    // (offset per classe di dispositivo) + (offset ulteriore per i sub devices di ricezione del terminale) + DevNo
+    // (offset per classe di dispositivo) + (offset ulteriore per i sub devices di ricezione del terminale) + DevNo + 1
     // DevNo va da 0 a 7
-    return ((IntlineNo - 3) * 8) + (isRx * 8) + DevNo;
+    return ((IntlineNo - 3) * 8) + (isRx * 8) + DevNo + 1;
 }
 
 static void doIO(state_t* processorState) {
@@ -473,7 +473,7 @@ void nonTimerInterrupts(unsigned int excCode, state_t* processorState) {
 
     // 2. Calcola l'indirizzo base e prepara le variabili
     memaddr devAddrBase = START_DEVREG + ((IntlineNo - 3) * 0x80) + (devNo * 0x10);
-    int semIndex = (IntlineNo - 3) * 8 + devNo;
+    int semIndex = (IntlineNo - 3) * 8 + devNo + 1;
     unsigned int status;
 
     if (excCode == IL_TERMINAL) { 

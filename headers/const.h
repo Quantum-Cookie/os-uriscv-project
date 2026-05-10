@@ -243,6 +243,6 @@
 
 
 
-#define PSEUDO_SEMAPHORE_INDEX 48
+#define PSEUDO_SEMAPHORE_INDEX 0
 #endif
 
