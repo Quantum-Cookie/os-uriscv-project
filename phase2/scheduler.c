@@ -10,6 +10,7 @@ void scheduler() {
     // Estrae processo da eseguire nella Ready Queue
     pcb_t* processToRun = removeProcQ(&readyQueue);
 
+    // Controlla se c'e' almeno un processo pronto per l'esecuzione
     if (processToRun) {
         currentProcess = processToRun;
 
