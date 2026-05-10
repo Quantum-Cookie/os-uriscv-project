@@ -16,8 +16,6 @@
 
 static void syscallExceptionHandler(state_t* processorState);
 
-static void passUpOrDie(state_t* processorState, unsigned int index);
-
 static void createProcess(state_t* processorState);
 static void terminateProcess(state_t* processorState);
 static void passeren(state_t* processorState);
@@ -28,6 +26,8 @@ static void WaitForClock(state_t* processorState);
 static void GetSupportData(state_t* processorState);
 static void GetProcessID(state_t* processorState);
 static void Yield (state_t* processorState);
+
+static void passUpOrDie(state_t* processorState, unsigned int index);
 
 /*
 void uTLB_RefillHandler() {
@@ -196,11 +196,13 @@ static int recursiveTermination(pcb_t* toTerminate) {
     if (toTerminate->p_semAdd) {
         int* savedSemAdd = toTerminate->p_semAdd;  // salva PRIMA di outBlocked
         outBlocked(toTerminate);
-        (*savedSemAdd)++;
+        //(*savedSemAdd)++;
         int semIndex = savedSemAdd - &deviceSemaphore[0];
         if (semIndex >= 0 && semIndex < NRSEMAPHORES) {
             softBlockCount--;
         }
+        else
+           (*savedSemAdd)++;
     } else if (toTerminate != currentProcess) {
         outProcQ(&readyQueue, toTerminate);
     }
