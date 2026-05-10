@@ -1,5 +1,5 @@
-#include "./headers/asl.h"
-#include "./headers/pcb.h"
+#include "asl.h"
+#include "pcb.h"
 
 static semd_t semd_table[MAXPROC];
 static struct list_head semdFree_h;

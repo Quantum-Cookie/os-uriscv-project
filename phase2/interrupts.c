@@ -1,11 +1,11 @@
-#include "./headers/interrupts.h"
+#include "interrupts.h"
+
 #include <uriscv/liburiscv.h>
-#include "../phase1/headers/pcb.h"
-#include "./headers/scheduler.h"
 
-#include "./headers/initial.h"
-
-#include "./headers/utils.h"
+#include "pcb.h"
+#include "scheduler.h"
+#include "initial.h"
+#include "utils.h"
 
 void processorLocalTimerInt(state_t* processorState) {
     // Acknoledge interrupt e carica il nuovo valore

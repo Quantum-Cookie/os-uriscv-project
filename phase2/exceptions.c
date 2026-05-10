@@ -1,20 +1,18 @@
-#include "./headers/exceptions.h"
+#include "exceptions.h"
+
 #include <uriscv/liburiscv.h>
 #include <uriscv/cpu.h>
 #include <uriscv/types.h>
 
-#include "./headers/scheduler.h"
-#include "./headers/interrupts.h"
-
-#include "../headers/listx.h"
-#include "../headers/types.h"
-#include "../headers/const.h"
-
-#include "../phase1/headers/pcb.h"
-#include "../phase1/headers/asl.h"
-#include "./headers/initial.h"
-
-#include "./headers/utils.h"
+#include "scheduler.h"
+#include "interrupts.h"
+#include "listx.h"
+#include "types.h"
+#include "const.h"
+#include "pcb.h"
+#include "asl.h"
+#include "initial.h"
+#include "utils.h"
 
 // Restituisce l'exception code
 //#define GET_EXEC_CODE(cause) (((cause) & CAUSE_EXCCODE_MASK))

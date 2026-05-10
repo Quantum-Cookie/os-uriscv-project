@@ -1,7 +1,7 @@
 #ifndef INTERRUPTS_H
 #define INTERRUPTS_H
 
-#include "../../headers/types.h"
+#include "types.h"
 
 void deviceInterruptHandler();
 void nonTimerInterrupts(unsigned int excCode, state_t* processorState);

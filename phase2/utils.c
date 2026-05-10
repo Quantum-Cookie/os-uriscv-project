@@ -1,8 +1,8 @@
-#include "./headers/utils.h"
+#include "utils.h"
 
-#include "./headers/initial.h"
-#include "../phase1/headers/pcb.h"
-#include "../phase1/headers/asl.h"
+#include "initial.h"
+#include "pcb.h"
+#include "asl.h"
 
 void copyState(state_t* src, state_t* dest) {
     dest->entry_hi = src->entry_hi;

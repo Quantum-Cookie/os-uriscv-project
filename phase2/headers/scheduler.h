@@ -1,9 +1,9 @@
 #ifndef SCHEDULER_H
 #define SCHEDULER_H
 
-#include "../../headers/listx.h"
-#include "../../headers/types.h"
-#include "../../headers/const.h"
+#include "listx.h"
+#include "types.h"
+#include "const.h"
 
 void scheduler();
 

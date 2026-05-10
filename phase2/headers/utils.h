@@ -2,7 +2,7 @@
 #define UTILS_H
 
 #include <uriscv/cpu.h>
-#include "../../headers/types.h"
+#include "types.h"
 
 // Restituisce l'exception code
 #define GET_EXEC_CODE(cause) (((cause) & CAUSE_EXCCODE_MASK))

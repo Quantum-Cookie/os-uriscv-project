@@ -1,8 +1,10 @@
-#include "./headers/scheduler.h"
-#include "./headers/initial.h"
-#include "../phase1/headers/pcb.h"
-#include "../phase1/headers/asl.h"
+#include "scheduler.h"
+
 #include <uriscv/liburiscv.h>
+
+#include "initial.h"
+#include "pcb.h"
+#include "asl.h"
 
 void scheduler() {
     // Estrae processo da eseguire nella Ready Queue

@@ -1,4 +1,4 @@
-#include "./headers/pcb.h"
+#include "pcb.h"
 
 static struct list_head pcbFree_h;
 static pcb_t pcbFree_table[MAXPROC];
