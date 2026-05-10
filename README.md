@@ -13,6 +13,10 @@ PandOSsh è un progetto educativo pensato per comprendere il funzionamento reale
     - **Gestione Interrupt:** Gestisce gli Interrupt provenienti dai dispositivi di I/O e dai timer.
     - **Pass Up or Die:** Gestisce le chiamate alle SYSCALL no definite, i Program Trap e le eccezioni TLB.
 
+## Documentation
+- [Phase 1](./docs/phase-1.md)
+- [Phase 2](./docs/phase-2.md)
+
 ## Requirements
 - **CMake** >= 3.25
 - **Toolchain:** gcc-riscv64-unknown-elf
