@@ -242,6 +242,7 @@
 
 
 
+#define PROCESSOR_ID 0
 
 #define PSEUDO_SEMAPHORE_INDEX 0
 #endif

@@ -4,6 +4,7 @@
 #include <uriscv/types.h>
 
 #include "./headers/scheduler.h"
+#include "./headers/interrupts.h"
 
 #include "../headers/listx.h"
 #include "../headers/types.h"
@@ -13,12 +14,14 @@
 #include "../phase1/headers/asl.h"
 #include "./headers/initial.h"
 
+#include "./headers/utils.h"
+
 // Restituisce l'exception code
-#define GET_EXEC_CODE(cause) (((cause) & CAUSE_EXCCODE_MASK))
+//#define GET_EXEC_CODE(cause) (((cause) & CAUSE_EXCCODE_MASK))
 
-#define PROCESSOR_ID 0
+//#define PROCESSOR_ID 0
 
-static void deviceInterruptHandler();
+//static void deviceInterruptHandler();
 static void syscallExceptionHandler(state_t* processorState);
 
 static void passUpOrDie(state_t* processorState, unsigned int index);
@@ -122,6 +125,7 @@ void syscallExceptionHandler(state_t* processorState) {
     }
 }
 
+#if 0
 static void copyState(state_t* src, state_t* dest) {
     dest->entry_hi = src->entry_hi;
     dest->cause = src->cause;
@@ -134,6 +138,7 @@ static void copyState(state_t* src, state_t* dest) {
         dest->gpr[i] = src->gpr[i];
     }
 }
+#endif
 
 static void createProcess(state_t* processorState) {
     pcb_t* newPcb = allocPcb();
@@ -170,6 +175,7 @@ static void createProcess(state_t* processorState) {
     LDST(processorState);
 }
 
+#if 0
 /**
  * @brief Salva lo stato del processo attuale nell'apposito campo e aggiona il tempo di utilizzo CPU accumulato
  * 
@@ -182,6 +188,7 @@ static void updateProcessState(state_t* processorState, pcb_t* process) {
     copyState(processorState, &process->p_s);
     process->p_time += actTime - startRunningTime;
 }
+#endif
 
 static pcb_t* searchByPid(int pid, pcb_t* root) {
     if (root->p_pid == pid) 
@@ -281,6 +288,7 @@ static void passeren(state_t* processorState) {
     }
 }
 
+#if 0
 static pcb_t* vOnSem(int* semAddr) {
     (*semAddr)++;
     pcb_t* readyProc = NULL;
@@ -292,6 +300,7 @@ static pcb_t* vOnSem(int* semAddr) {
     }
     return readyProc;
 }
+#endif
 
 static void verhogen(state_t* processorState) {
     int* semAddr = (int*)processorState->reg_a1;
@@ -438,6 +447,7 @@ static void Yield (state_t* processorState){
 /****
  * DA SPOSTARE IN INTERRUPT.C
  */
+#if 0
 void processorLocalTimerInt(state_t* processorState) {
     // Acknoledge interrupt e carica il nuovo valore
     setTIMER(TIMESLICE);
@@ -554,6 +564,7 @@ static void deviceInterruptHandler() {
             break;
     }        
 };
+#endif
 
 /****
  * END
