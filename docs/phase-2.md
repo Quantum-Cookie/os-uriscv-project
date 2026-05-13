@@ -1,5 +1,6 @@
 # PandOSsh - Fase 2
 
+
 ## Variabili Globali
 Sono state introdotte una serie di variabili condivise tra i diversi moduli della fase 2:
 
@@ -27,6 +28,7 @@ Sono state introdotte una serie di variabili condivise tra i diversi moduli dell
 
 `cpu_t startRunningTime`: Memorizza il timestamp del momento in cui **currentProcess** inizia la sua esecuzione per calcolare tempo totale di CPU consumato.
 
+
 ## Utilità variabile `rootProcess`
 
 La variabile globale `rootProcess` è stata introdotta per facilitare la ricerca del PCB con un id specifico. Utilizzato nella SYSCALL **NSYS2** quando il pid del processo da terminare sia diverso da 0.
@@ -39,6 +41,7 @@ Tale approccio è coerente con le specifiche del progetto in quanto:
 Un altra possibilità, sarebba quella di usare una lista doppiamente concatenata circolare di tutti i processi attivi in quel momento: tale lista dovrebbe contenere i processi nella coda readyReady, quelli bloccati, e quello in esecuzione. Tuttavia bisognerebbe ricordarsi di aggiornare la lista per mantenerlo coerente alla situazione reale e aggiungere un campo al PCB in modo da collegarlo a tale lista.
 
 Utilizzando invece la variabile `rootProcess` è sufficiente memorizzarlo una volta e non serve più modificarlo. Entrambe le scelte hanno lo stesso costo per ricerca: `O(n)` con n il numero di processi attualmente attivi. 
+
 
 ## Inizializzazione del nucleo
 
@@ -65,6 +68,90 @@ Quando la coda `readyQueue` risulta vuota, in base allo stato attuale lo schedul
 - Se `processCount > 0 && softBlockCount == 0`: Significa che c'è deadlock in quanto ci sono processi in attesa ma nessuno di questi sta attendendo eventi esterni, e invoca `PANIC`.
 
 
+## Exceptions
+
+La funzione che rappresenta il handler generale delle eccezioni si deve occupare di smistare i vari casi in base al **exception code** che si ottiene tramite la funzione `getCause()`:
+
+- se la macro `CAUSE_IS_INT` restituisce true allora e' un **interrupt** - `deviceInterruptHandler`
+- 24-28: TLB exceptions - `passUpOrDie`
+- 8-11: SYSCALL - `syscallExceptionHandler`
+- 0-7, 9, 10, 12-23: program trap `passUpOrDie`
+
+
+## SYSCALL
+La chiamata è fatta secondo la sintassi:
+
+```c
+SYSCALL(a0, a1, a2, a3);
+```
+In `a0` si trova il valore della SYSCALL chiamata, mentre in `a1, a2, a3` gli eventuali parametri richiesti per poter soddisfare la richiesta.
+
+Tutte le SYSCALL implementate (-1 a -10) sono progettate per essere utilizzate solo dai processi privilegiati (**kernel-mode**):
+
+| Valore (a0) | Nome Servizio      | Descrizione                                                                                                    |
+| :---------- | :----------------- | :------------------------------------------------------------------------------------------------------------- |
+| **-1**      | `CREATEPROCESS`    | Crea un processo figlio con i parametri forniti. Restituisce il PID o -1 se mancano PCB.                       |
+| **-2**      | `TERMINATEPROCESS` | Termina il processo specificato in `a1` (0 per se stesso) e tutti i suoi figli.                                |
+| **-3**      | `PASSEREN (P)`     | Esegue un'operazione P sul semaforo all'indirizzo `a1`. Può bloccare il processo.                              |
+| **-4**      | `VERHOGEN (V)`     | Esegue un'operazione V non bloccante sul semaforo all'indirizzo `a1`.                                          |
+| **-5**      | `DOIO`             | Esegue I/O sincrono scrivendo il comando `a2` all'indirizzo `a1`. Blocca il processo fino fine operazione I/O. |
+| **-6**      | `GETCPUTIME`       | Restituisce in `a0` il tempo CPU accumulato (in microsecondi) dal processo chiamante.                          |
+| **-7**      | `WAITFORCLOCK`     | Blocca il processo sulla Pseudo-clock finché non viene sbloccato dal Pseudo-clock tick.                        |
+| **-8**      | `GETSUPPORTPTR`    | Restituisce `p_supportStruct` del processo corrente.                                                           |
+| **-9**      | `GETPID`           | Restituisce il PID del chiamante (se `a1` è 0) o il PID del genitore.                                          |
+| **-10**     | `YIELD`            | Il processo cede volontariamente la CPU.                                                                       |
+
+
+### Note
+- **Incremento del PC**: Bisogna sempre incrementare il valore del PC di 4 per i processi che non vengono terminati, evitando loop infinito di SYSCALL.
+- **Stato del processore**: Lo stato del processo salvato nel PCB è **obsoleto** quindi nelle SYSCALL bloccanti è necessario l'aggiornamento con quello salvato nel BIOS Data Page. Naturalmente se si deve ritornare al chiamante bisogna usare lo stato alla chiamata.
+- **Valori di ritorno**: Eventuali valori di ritorno vengono posizionati nel registro `a0`.
+**Gestione SYSCALL >= 1**: Le chiamate con valore positivo in `a0` non sono gestite direttamente come servizi del Nucleus, ma seguono la politica **Pass Up or Die** verso il livello Support
+
+
+## Calcolo indice del semaforo per i dispositivi esterni dato indirizzo del command field
+
+Per il calcolo servono informazioni preliminari:
+  
+| Elemento                                      | Dimensione (Byte) |
+| :-------------------------------------------- | :---------------- |
+| Un campo del Device Register                  | 0x04              |
+| Device Register                               | 0x10              |
+| Tutti i Device Register per un interrupt Line | 0x80              |
+
+Abbiamo la formula per i dispositivi non terminal e terminal receiver:
+
+`commandAddr = 0x10000054 + ((IntlineNo - 3) * 0x80) + (DevNo * 0x10) + 0x4` 
+
+per i dispositivi terminal transmitter:
+
+`commandAddr = 0x10000054 + ((IntlineNo - 3) * 0x80) + (DevNo * 0x10) + 0x8` 
+
+DevNo varia tra 0-7.
+
+### Calcolo IntLineNo
+Nella tabella abbiamo riportato che la dimensione totale di tutti i Device Register per un singolo interrupt line è di **0x80**, e la seconda parte (quella che indica il numero del dispositivo e il campo all'interno del registro) non può mai arrivare a 0x80. In base a tale ragionamento si può fare:
+
+`IntlineNo = (commandAddr - 0x10000054) / 0x80 + 3`
+
+Andando a troncare il risultato ottenuto si ottiene `IntlineNo`.
+
+### Calcolo DevNo
+Con ragionamente simile al precedente (gli offset 0x04 e 0x08 sono minori della dimensione del Device Register 0x10), sempre con troncamento:
+
+`DevNo = ((commandAddr - 0x10000054) % 0x80)`
+
+### Distinguere terminal receiver da transmitter
+Basta verificare indirizzo del comando sia riferito al campo 1 (rx) o campo 3 (tx). Contando i campi da 0. Ricordando che un campo ha dimensione 0x04.
+
+Quindi:
+- è rx se: `(commandAddr - 0x10000054) % 0x10 == 0x04`
+- è tx se: `(commandAddr - 0x10000054) % 0x10 == 0x0c`
+
+
 ## Ricerca processo con PId specificato
 
 Anche se la ricerca con `rootProcess` dovrebbe utilizzare la chiamata ricorsiva in quanto non si riesce ad avere memoria dinamica per ad esempio una pila se si vuole evitare la ricorsione.
+
+## Accumulo CPU time
+
