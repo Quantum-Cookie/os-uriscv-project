@@ -1,8 +1,11 @@
 #ifndef EXCEPTIONS_H
 #define EXCEPTIONS_H
 
-//void uTLB_RefillHandler();
+/**
+ * @brief Funzione handler generale delle eccezioni
+ * 
+ */
 void exceptionHandler();
 
-#endif // !EXCEPTIONS_H
+#endif
 

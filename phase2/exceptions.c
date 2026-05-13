@@ -38,6 +38,7 @@ void uTLB_RefillHandler() {
 }
 */
 
+// Funzione handler generale delle eccezioni
 void exceptionHandler() {
     unsigned int cause = getCAUSE();
     
@@ -46,34 +47,48 @@ void exceptionHandler() {
         deviceInterruptHandler();
     }
     else {
+        // BIOS Data Page per il processore 0
         state_t* processorState = GET_EXCEPTION_STATE_PTR(PROCESSOR_ID);
         switch (GET_EXEC_CODE(cause)) {
+            // TLB exceptions
             case 24 ... 28:
                 passUpOrDie(processorState, PGFAULTEXCEPT);
                 break;
 
+            // SYSCALL
             case 8:
             case 11:
                 syscallExceptionHandler(processorState);
                 break;
 
+            // Program Trap
             case 0 ... 7:
             case 9 ... 10:
             case 12 ... 23:
                 passUpOrDie(processorState, GENERALEXCEPT);
                 break;
 
+            // Non ci dovrebbe mai arrivare
             default:
                 break;
         } 
     }
 }
 
-
+/**
+ * @brief Handler delle SYSCALL
+ * 
+ * @param processorState Puntatore allo stato del processore nel momento dell'eccezione
+ * 
+ */
 void syscallExceptionHandler(state_t* processorState) {
+    // Incremento del PC per evitare loop infinito di SYSCALL
     processorState->pc_epc += 4;
 
+    // Nel registro a0 si trova il valore riferito alla SYSCALL richiesta
     int a0 = processorState->reg_a0;
+    
+    // Controlla se e' stata richiesta una SYSCALL, controllo preliminare in quanto le attuali SYSCALL sono solo per processi kernel
     if (-10 <= a0 && a0 <= -1) {
         // Controlla se il processo corrente e' in kernel mode
         if (((processorState->status & MSTATUS_MPP_MASK) == MSTATUS_MPP_M)) {
@@ -108,116 +123,154 @@ void syscallExceptionHandler(state_t* processorState) {
                 case YIELD:
                     Yield(processorState);
                     break;
-                default:
-                    /*if (a0 >= 1) {
-                        //processorState->pc_epc += 4;
-
-                        passUpOrDie(processorState, GENERALEXCEPT);
-                    }*/
-                    break;
             }
         }
+        // Altrimenti il processo corrente non ha i permessi e viene generato un Program Trap
         else {
-            //processorState->pc_epc += 4;
-
             currentProcess->p_supportStruct->sup_exceptState[GENERALEXCEPT].cause = PRIVINSTR;
             passUpOrDie(processorState, GENERALEXCEPT);
         }
     }
+    // Se il valore della SYSCALL e' >= 1 allora si cerca di passare il controllo al livello supporto specificato (se presente)
     else if (a0 >= 1) {
-        //processorState->pc_epc += 4;
-
         passUpOrDie(processorState, GENERALEXCEPT);
     }
 }
 
+
+/**
+ * @brief NSYS1: CreateProcess
+ * Alloca un nuovo PCB e lo inizializza come figlio del processo corrente
+ * Restituisce in a0 PID del nuovo processo in caso di successo, -1 altrimenti. 
+ * 
+ * @param processorState Puntatore allo stato del processore nel momento dell'eccezione
+ * 
+ */
 static void createProcess(state_t* processorState) {
+    /*
+    - a1: Stato del processore del nuovo processo (state_t *)
+    - a2: Priorita' del nuovo processo (int)
+    - a3: Puntatore alla Support Structure (support_t *)
+    */
+    
+    // p_time, p_semAdd, p_pid gia' inizializzati con allocPcb 
     pcb_t* newPcb = allocPcb();
 
-    // Controllo se ci sono ancora PCB liberi
+    // Controllo se e' stato allocato un nuovo PCB, in caso negativo restituisco -1 e ritorno il controllo al chiamante
     if (!newPcb) {
         processorState->reg_a0 = -1;
-
-        //processorState->pc_epc += 4;
-
         LDST(processorState);
         return;
     }
 
-    // p_time, p_semAdd, p_pid gia' inizializzati con allocPcb 
-    //newPcb->p_s = *((state_t*)(processorState->reg_a1));
+    // Imposto i parametri del nuovo processo con i dati passati
     copyState((state_t*)(processorState->reg_a1), &newPcb->p_s);
-
     newPcb->p_prio = processorState->reg_a2;
+    newPcb->p_supportStruct = (support_t *)processorState->reg_a3;
 
-    if (processorState->reg_a3)
-        newPcb->p_supportStruct = (support_t *)processorState->reg_a3;
-    else
-        newPcb->p_supportStruct = NULL;
-
+    // Aggiunge il nuovo processo nella readyQueue per permettere la sua esecuzione
     insertProcQ(&readyQueue, newPcb);
+
+    // Aggiunge il nuovo processo creato come figlio del chiamante della SYSCALL
     insertChild(currentProcess, newPcb);
     processCount++;
 
-    // Restituzione pid al chiamante
+    // Restituzione PId del processo creato al chiamante
     processorState->reg_a0 = newPcb->p_pid;
 
-    // Aggiorna PC e restituisce il controllo al chiamante
-    //processorState->pc_epc += 4;
-
+    // Restituisce il controllo al chiamante
     LDST(processorState);
 }
 
-
+/**
+ * @brief Funzione ausiliaria utilizzata per la ricerca di un PCB con pid in un albero/sottoalbero
+ * 
+ * @param pid Valore pid da ricercare
+ * @param root Puntatore al punto di partenza della ricerca
+ * @return pcb_t* Restituisce il puntatore al PCB ricercato, in caso di fallimento restituisce NULL
+ * 
+ */
 static pcb_t* searchByPid(int pid, pcb_t* root) {
+    // Se PCB ricercato e' root fa return immediato
     if (root->p_pid == pid) 
         return root;
 
     pcb_t* child;
+    // Effettua una ricerca ricorsiva in profondita' sull'albero
     list_for_each_entry(child, &root->p_child, p_sib) {
         pcb_t* res = searchByPid(pid, child);
         if (res)
             return res;
     }
     
+    // Caso fallimento ricerca
     return NULL;
 }
 
+/**
+ * @brief Terminazione del processo passato e tutti i rispettivi figli
+ * 
+ * @param toTerminate Il processo padre di tutti i processi da terminare, anch'esso verra' terminato
+ * @return int 1 se il processo corrente (currentProcess) è stato terminato, 0 altrimenti
+ * 
+ * @note Il processo `toTerminate` non viene rimosso dall'albero dei processi
+ */
 static int recursiveTermination(pcb_t* toTerminate) {
+    // Serve per dire al chiamante se il processo corrente in esecuzione e' stato terminato o meno
     int terminatedCurrent = (toTerminate == currentProcess);
 
+    // Itera per terminare tutti i processi figli
     while (!emptyChild(toTerminate))
     {
-        // Itera per terminare tutti i processi figli
         pcb_t* childToTerminate = removeChild(toTerminate);
         terminatedCurrent += recursiveTermination(childToTerminate);
     }
 
+    // Verifica se il processo terminato era bloccato su un semaforo
     if (toTerminate->p_semAdd) {
-        int* savedSemAdd = toTerminate->p_semAdd;  // salva PRIMA di outBlocked
+        int* savedSemAdd = toTerminate->p_semAdd; 
         outBlocked(toTerminate);
-        //(*savedSemAdd)++;
+
         int semIndex = savedSemAdd - &deviceSemaphore[0];
-        if (semIndex >= 0 && semIndex < NRSEMAPHORES) {
+        // Se il processo era bloccato su un semaforo per dispositivi esterni
+        if (semIndex >= 0 && semIndex < NRSEMAPHORES)
+            // Decrementa il Soft-block Count
             softBlockCount--;
-        }
+
+        // Se era bloccato per un semaforo utente
         else
+            // Allora lo incrementa per evitare eventuali deadlock
            (*savedSemAdd)++;
     } else if (toTerminate != currentProcess) {
         outProcQ(&readyQueue, toTerminate);
     }
 
+    // Decrementa Process Count e libera il PCB per poter essere utilizzato da un altro nuovo processo
     processCount--;
     freePcb(toTerminate);
 
     return (terminatedCurrent > 0);
 }
 
+/**
+ * @brief NSYS2: TerminateProcess
+ * Termina il processo in base al PID.
+ * Se PID = 0 termina il processo chiamante, altrimenti il processo con PID passato
+ * 
+ * @param processorState Puntatore allo stato del processore nel momento dell'eccezione
+ * 
+ * @note Invoca sempre lo Scheduler al termine
+ */
 static void terminateProcess(state_t* processorState) {
+    /*
+    * a1: PID del processo da terminare (int)
+    */
+
     int pid = processorState->reg_a1;
     int terminatedCurrent = 0;
     pcb_t* toTerminate =  NULL;
 
+    // Se pid da terminare e' 0 allora deve terminare dal processo corrente, altrimenti lo ricerca nell'albero dei processi
     if (pid == 0) {
         toTerminate = currentProcess;
     }
@@ -225,26 +278,35 @@ static void terminateProcess(state_t* processorState) {
         toTerminate = searchByPid(pid, rootProcess);
     }
 
+    // Controlla se effettivamente esiste il processo da terminare
     if (toTerminate) {
+        // lo rimuove dall'albero dei processi e lo termina insieme ai progeniti
         outChild(toTerminate);
         terminatedCurrent = recursiveTermination(toTerminate);
     }
 
+    // Verifica se il processo corrente non sia stato terminato
     if (!terminatedCurrent) {
-        //processorState->pc_epc += 4;
-
-        
+        // Aggiorna lo stato del processo in memoria con quello attuale e lo inserisce nella Ready Queue
         updateProcessState(processorState, currentProcess);
-    
         insertProcQ(&readyQueue, currentProcess);
     }
     else {
+        // Se e' stato terminato imposta NULL a currentProcess per mantenere coerenza
         currentProcess = NULL;
     }
 
     scheduler();
 }
 
+/**
+ * @brief Funzione ausiliaria che effettua una P sul semaforo indicato
+ * 
+ * @param semAddr Puntatore al semaforo su cui effettuare l'operazione
+ * @param processorState Puntatore allo stato del processore nel momento dell'eccezione
+ * 
+ * @note Per vedere se il processo dopo la P e' stata bloccata o meno bisogna verificare `currentProcess`
+ */
 static void pOnSem(int* semAddr, state_t* processorState) {
     (*semAddr)--;
     if (*semAddr < 0) {
@@ -255,32 +317,54 @@ static void pOnSem(int* semAddr, state_t* processorState) {
     }
 }
 
+/**
+ * @brief NSYS3: Passeren (P)
+ * Effettua una P sul semaforo passato in base al valore si potra' bloccare o meno
+ * 
+ * @param processorState Puntatore allo stato del processore nel momento dell'eccezione
+ */
 static void passeren(state_t* processorState) {
-    int* semAdrr = (int*)processorState->reg_a1;
-    //processorState->pc_epc += 4;
+    /*
+    * a1: Indirizzo del semaforo su cui effettuare operazione di P (int *)
+    */
 
+    int* semAdrr = (int*)processorState->reg_a1;
     
     pOnSem(semAdrr, processorState);
 
     // Se il processo si è bloccato, currentProcess è NULL e dobbiamo chiamare lo scheduler.
-    // Se non si è bloccato, eseguiamo LDST.
     if (currentProcess == NULL) {
         scheduler();
+    // Se non si è bloccato, eseguiamo LDST per riprendere l'esecuzione del chiamante
     } else {
         LDST(processorState);
     }
 }
 
+/**
+ * @brief NSYS4: Verhogen (V)
+ * Effettua una V sul semaforo passato, se c'erano processi bloccati su tale semaforo verranno reinseriti in Ready Queue
+ * 
+ * @param processorState Puntatore allo stato del processore nel momento dell'eccezione
+ */
 static void verhogen(state_t* processorState) {
+    /*
+    * a1: Indirizzo del semaforo su cui effettuare operazione di V (int *)
+    */
+    
     int* semAddr = (int*)processorState->reg_a1;
 
     vOnSem(semAddr);
 
-    //processorState->pc_epc += 4;
-
     LDST(processorState);
 }
 
+/**
+ * @brief Funzione ausiliare che serve per mappare da indirizzi dei Device Registers Area agli indici dell'array dei semafori per dispositivi
+ * 
+ * @param addr Indirizzo appartenente ad Device Registers Area
+ * @return unsigned int Indice del semaforo (compreso tra 1-48) del dispositivo che corrisponde all'indirizzo passato
+ */
 static unsigned int mapDeviceSemaphoreByAddr(unsigned int addr) {
     /*** 
      * Index 0: intlineNo 2
@@ -291,15 +375,22 @@ static unsigned int mapDeviceSemaphoreByAddr(unsigned int addr) {
      * Index 33-40: intlineNo 7 - tx
      * Index 41-48: intlineNo 7 - rx
      * 
-     * La mappatura rispetta ordine di priorita', piu' basso e' piu' e' prioritario apparte per Interval timer per facilitare la gestione
-     * e una maggiore chiarezza nella mappatura, altrimenti basterebbe fare shift tutto di 1 e mettere index 0 per Interval timer.
+     * La mappatura rispetta ordine di priorita', piu' basso e' piu' e' alto la priorita'. Indice 0 apparte per Pesudo-clock per facilitare la gestione
+     * e una maggiore chiarezza nella mappatura, altrimenti basterebbe fare shift tutto di 1 e mettere index 0 per Pesudo-clock.
      * 
      * Interval timer non ha un registro gestito con offset, quindi tale funzione non puo' fornire la mappatura per essa.
      */
 
-    // Ci sono calcoli ridondanti come il +3 messo per IntlineNo, lo si ha lasciato per maggiore chiarezza
+    // devAddrBase = 0x10000054 + ((IntlineNo - 3) * 0x80) + (DevNo * 0x10)
+    // offset rispetto all'inizio di Device Register Area
     unsigned int offset = addr - START_DEVREG;
+    
+    // Numero della linea di interrupt (3-7)    
+    // I blocchi di linea hanno dimensione 0x80 byte uno
     unsigned int IntlineNo = (offset / 0x80) + 3;
+
+    // Numero del dispositivo (0-7) all'interno della linea
+    // Prima isoliamo l'offset relativo alla linea specifica, poi dividiamo per la dimensione del registro device (0x10)
     unsigned int DevNo = (offset % 0x80) / 0x10;
 
     unsigned int isRx = 0;
@@ -310,66 +401,94 @@ static unsigned int mapDeviceSemaphoreByAddr(unsigned int addr) {
     }
 
     // (offset per classe di dispositivo) + (offset ulteriore per i sub devices di ricezione del terminale) + DevNo + 1
-    // DevNo va da 0 a 7
     return ((IntlineNo - 3) * 8) + (isRx * 8) + DevNo + 1;
 }
 
+/**
+ * @brief NSYS 5: DoIO
+ * Si supporta solo I/O sincroni quindi il processo passera' allo stato "blocked"
+ * 
+ * @param processorState Puntatore allo stato del processore nel momento dell'eccezione
+ */
 static void doIO(state_t* processorState) {
-    // SYSCALL(DOIO, int *commandAddr, int commandValue, 0);
+    /*
+    * a1: Indirizzo del registro di comando del dispositivo (int *)
+    * a2: Comando (int)
+    */
     
+    unsigned int commandAddr = processorState->reg_a1;
+    unsigned int commandValue = processorState->reg_a2;
+
     // Scrivo il comando nel registro specificato
-    *(unsigned int*)(processorState->reg_a1) = processorState->reg_a2;
+    *(unsigned int*)(commandAddr) = commandValue;
 
     // Identifico quale semaforo usare
-    unsigned int semaphoreIndex = mapDeviceSemaphoreByAddr(processorState->reg_a1);
+    unsigned int semaphoreIndex = mapDeviceSemaphoreByAddr(commandAddr);
 
-    //processorState->pc_epc += 4;
-
-
-    // Faccio P sul semaforo trovato
+    // Faccio P sul semaforo trovato e incremento il Soft-block Count
     pOnSem(&deviceSemaphore[semaphoreIndex], processorState);
-    if (currentProcess == NULL) softBlockCount++;
+    softBlockCount++;
+
     scheduler();
 }
 
-//(ancora da testare)
-static void GetCPUTime(state_t* processorState){
+/**
+ * @brief NSYS6: GetCPUTime
+ * Restituisce in a0 il tempo totalmente utilizzato dal processo chiamante in ms
+ * 
+ * @param processorState Puntatore allo stato del processore nel momento dell'eccezione
+ */
+static void GetCPUTime(state_t* processorState) {
     //Tempo di utilizzo CPU del processo corrente accumulato durante l'esecuzione attuale 
     cpu_t currentTime;
     STCK(currentTime);
+
     //Somma del tempo di esecuzione attuale con quello accumulato in precedenza
     cpu_t CPUTime = currentProcess -> p_time + (currentTime - startRunningTime); 
+
     //Memorizzazione del tempo di utilizzo CPU totale nel registro a0
     processorState->reg_a0 = CPUTime;
-    //Aggiornamento del PC e ritorno all'esecuzione del chiamante
-    //processorState->pc_epc += 4;
 
+    //Ritorno all'esecuzione del chiamante
     LDST(processorState);
 }
-//(ancora da testare)
-static void WaitForClock(state_t* processorState) {
-    //Aggiornamento del PC
-    //processorState->pc_epc += 4;
 
-    //Faccio P sul semaforo del pseudo clock
+/**
+ * @brief NSYS7: WaitForClock
+ * Effettua una P sul semaforo per il Pesudo-clock. Passaggio allo stato "blocked" in attesa del prossimo Pesudo-clock tick
+ * 
+ * @param processorState Puntatore allo stato del processore nel momento dell'eccezione
+ */
+static void WaitForClock(state_t* processorState) {
+    //Faccio P sul semaforo del Pesudo-clock
     pOnSem(&deviceSemaphore[PSEUDO_SEMAPHORE_INDEX], processorState);    
-    if (currentProcess == NULL) softBlockCount++;
+
+    softBlockCount++;
     scheduler();
 }    
-//(ancora da testare)
-static void GetSupportData(state_t* processorState) {
-    if (currentProcess->p_supportStruct) {
-        processorState->reg_a0 = (int)currentProcess->p_supportStruct;
-    } else {
-        processorState->reg_a0 = (int)NULL;
-    }
-    //processorState->pc_epc += 4;
 
+/**
+ * @brief NSYS8: GetSupportData
+ * Restituisce in a0 il valore di p_supportStruct se presente, altrimenti NULL
+ * 
+ * @param processorState Puntatore allo stato del processore nel momento dell'eccezione
+ */
+static void GetSupportData(state_t* processorState) {
+    processorState->reg_a0 = (int)currentProcess->p_supportStruct;
     LDST(processorState);
 }
 
-//(ancora da testare)
+/**
+ * @brief NSYS9: GetProcessID
+ * Restituisce in a0 PID del processo chiamante (0), altrimenti PID del processo padre (else)
+ * 
+ * @param processorState Puntatore allo stato del processore nel momento dell'eccezione
+ */
 static void GetProcessID(state_t* processorState) {
+    /*
+    * a1: 0 se si vuole sapere PID del processo chiamante, altrimenti PID del processo padre
+    */
+
     // Controlla il parametro nel registro a1
     if (processorState->reg_a1 == 0) {
         // Restituisce il PID del processo chiamante
@@ -383,54 +502,62 @@ static void GetProcessID(state_t* processorState) {
         }
     }
     
-    // Incremento del PC per evitare il loop della SYSCALL
-    //processorState->pc_epc += 4;
-
-    
     // Ripristina lo stato del processore
     LDST(processorState);
 }
 
-//(ancora da testare)
-static void Yield (state_t* processorState){
-    //Aggiornamento del PC
-    //processorState->pc_epc += 4;
-
-    //Salvo lo stato del processo corrente
+/**
+ * @brief NYSYS10: Yield
+ * Rilascio volontario della CPU, non puo' essere scelto subito dallo Scheduler a meno che non ci siano altri processi in attesa nella Ready Queue
+ * 
+ * @param processorState Puntatore allo stato del processore nel momento dell'eccezione
+ */
+static void Yield(state_t* processorState) {
+    //Aggiorno lo stato del processo corrente
     updateProcessState(processorState, currentProcess);
 
+    // Se la Ready Queue non e' vuota
     if (!emptyProcQ(&readyQueue)) {
-        // Estraiamo il processo in cima (quello che dovrebbe essere eseguito ora)
+        // Estraiamo il processo in cima (quello che dovrebbe essere eseguito ora con la chiamata allo scheduler)
         pcb_t *nextToRun = removeProcQ(&readyQueue);
         
-        // Inseriamo il processo corrente rispettando la sua priorità.
-        // Se è a priorità altissima, tornerà in cima alla readyQueue (dietro ad altri di pari livello).
+        // Inseriamo il processo corrente nella Ready Queue
         insertProcQ(&readyQueue, currentProcess);
         
         // Rimettiamo il processo 'nextToRun' esattamente in TESTA alla lista,
-        // garantendo che sia LUI ad essere scelto dallo scheduler tra un istante.
+        // garantendo che sia scelto dallo scheduler alla chiamta
         list_add(&(nextToRun->p_list), &readyQueue);
     } else {
-        // Se è l'unico processo nel sistema, riparte lui come da specifica
+        // Altrimenti ci limitiamo ad inserirlo nella Ready Queue 
         insertProcQ(&readyQueue, currentProcess);
     }
     
-    //Faccio partire lo scheduler
     currentProcess = NULL;
     scheduler();
 }
 
+/**
+ * @brief Pass Up or Die
+ * Se p_supportStruct del processo corrente e' NULL viene terminato con i suoi progeniti, 
+ * altrimenti l'eccezione viene passato alla routine specificata del Support Level
+ * 
+ * @param processorState Puntatore allo stato del processore nel momento dell'eccezione
+ * @param index Indice per indicare se e' TLB exceptions (0) e non-TLB exceptions (1)
+ */
 static void passUpOrDie(state_t* processorState, unsigned int index) {
     // Se il puntatore p_supportStruct e' nullo termina il processo e tutti i suoi progeniti
     if (!currentProcess->p_supportStruct) {
         outChild(currentProcess);
         recursiveTermination(currentProcess);
-        currentProcess = NULL;
 
+        currentProcess = NULL;
         scheduler();
     }
     else {
+        // Copia exception state nel sup_exceptState indicato da index 
         copyState(processorState, &(currentProcess->p_supportStruct->sup_exceptState[index]));
+
+        // Passa il controllo alla routine del Support Level specificato
         LDCXT(currentProcess->p_supportStruct->sup_exceptContext[index].stackPtr, 
             currentProcess->p_supportStruct->sup_exceptContext[index].status, 
             currentProcess->p_supportStruct->sup_exceptContext[index].pc);
