@@ -157,9 +157,17 @@ Infine con tutti i dati calcolati, e riferendoci alla tabella di assegnazione de
 
 `semIndex = ((IntlineNo - 3) * 8) + (isRx * 8) + DevNo + 1`
 
+
 ## Ricerca e terminazione processo con PID specificato
 
-La ricerca del processo con `rootProcess` dovrebbe utilizzare la chiamata ricorsiva in quanto non si riesce ad avere memoria dinamica per ad esempio una pila se si vuole evitare la ricorsione.
+Sia la ricerca che la terminazione del processo utilizzano la ricorsione, scelta dovuta sia anche al fatto che `MAXPROC` è limitato a 20, limitando la profondità dell'albero, ma anche per una maggiore leggibilità. Se il numero di processi istanziabili fosse maggiore, l'utilizzo della ricorsione sarebbe inaccetabile e si potrebbe usare tecniche come DFS, sfruttando i puntatori `p_parent, p_child, p_sib` (si scende fino alla foglia per poi risalire). Se aumentasse molto forse risulterebbe meglio usare altre strutture dati di supporto come le hash table.
+
 
 ## Accumulo CPU time
 
+Il tempo trascorso dal momento in cui il processo viene  caricato sul processore fino a quando lo lascia volontariamente (tramite una SYSCALL) o involontariamente (per fine del time-slice) viene accreditato al processo stesso. Sono **considerate** anche le SYSCALL in quanto è un servizio chiesto in modo esplicito per propri scopi.
+
+Invece il tempo richiesto per gli interrupt (dispositivi I/O, timer) sono considerati tempi dovuti al Nucleo stesso.
+
+
+## Pass Up or Die
