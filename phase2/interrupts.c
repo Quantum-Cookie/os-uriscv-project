@@ -103,7 +103,7 @@ void intervalTimer(state_t* processorState) {
 void deviceInterruptHandler() {
     unsigned int excCode = GET_EXEC_CODE(getCAUSE());
 
-    state_t* processorState = GET_EXCEPTION_STATE_PTR(PROCESSOR_ID);
+    state_t* processorState = GET_EXCEPTION_STATE_PTR(PROCESSOR_ID_0);
     switch (excCode)
     {
         case IL_CPUTIMER:

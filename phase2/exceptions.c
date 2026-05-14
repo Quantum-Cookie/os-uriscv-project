@@ -48,7 +48,7 @@ void exceptionHandler() {
     }
     else {
         // BIOS Data Page per il processore 0
-        state_t* processorState = GET_EXCEPTION_STATE_PTR(PROCESSOR_ID);
+        state_t* processorState = GET_EXCEPTION_STATE_PTR(PROCESSOR_ID_0);
         switch (GET_EXEC_CODE(cause)) {
             // TLB exceptions
             case 24 ... 28:

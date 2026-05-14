@@ -28,6 +28,11 @@ Sono state introdotte una serie di variabili condivise tra i diversi moduli dell
 
 `cpu_t startRunningTime`: Memorizza il timestamp del momento in cui **currentProcess** inizia la sua esecuzione per calcolare tempo totale di CPU consumato.
 
+## Costanti
+
+Sono state aggiunte delle costanti nel file `headers/const.h`:
+- `PROCESSOR_ID_0: 0`: Rappresenta id del processore 0. 
+- `PSEUDO_SEMAPHORE_INDEX: 0`: Indice del semaforo utilizzato dal Pseudo-clock nell'array di semafori dedicato ai dispositivi esterni.
 
 ## Utilità variabile `rootProcess`
 
@@ -40,7 +45,7 @@ Tale approccio è coerente con le specifiche del progetto in quanto:
 
 Un altra possibilità, sarebba quella di usare una lista doppiamente concatenata circolare di tutti i processi attivi in quel momento: tale lista dovrebbe contenere i processi nella coda readyReady, quelli bloccati, e quello in esecuzione. Tuttavia bisognerebbe ricordarsi di aggiornare la lista per mantenerlo coerente alla situazione reale e aggiungere un campo al PCB in modo da collegarlo a tale lista.
 
-Utilizzando invece la variabile `rootProcess` è sufficiente memorizzarlo una volta e non serve più modificarlo. Entrambe le scelte hanno lo stesso costo per ricerca: `O(n)` con n il numero di processi attualmente attivi. 
+Utilizzando invece la variabile `rootProcess` è sufficiente memorizzarlo una volta e non serve più modificarlo. Entrambe le scelte hanno lo stesso costo per ricerca: `O(n)` con n il numero di processi attualmente attivi.
 
 
 ## Inizializzazione del nucleo
@@ -96,7 +101,7 @@ Tutte le SYSCALL implementate (-1 a -10) sono progettate per essere utilizzate s
 | **-4**      | `VERHOGEN (V)`     | Esegue un'operazione V non bloccante sul semaforo all'indirizzo `a1`.                                          |
 | **-5**      | `DOIO`             | Esegue I/O sincrono scrivendo il comando `a2` all'indirizzo `a1`. Blocca il processo fino fine operazione I/O. |
 | **-6**      | `GETCPUTIME`       | Restituisce in `a0` il tempo CPU accumulato (in microsecondi) dal processo chiamante.                          |
-| **-7**      | `WAITFORCLOCK`     | Blocca il processo sulla Pseudo-clock finché non viene sbloccato dal Pseudo-clock tick.                        |
+| **-7**      | `WAITFORCLOCK`     | Blocca il processo sulla Pseudo-clock finché non viene sbloccato dal Pseudo-clock tick (ogni 100ms).                        |
 | **-8**      | `GETSUPPORTPTR`    | Restituisce `p_supportStruct` del processo corrente.                                                           |
 | **-9**      | `GETPID`           | Restituisce il PID del chiamante (se `a1` è 0) o il PID del genitore.                                          |
 | **-10**     | `YIELD`            | Il processo cede volontariamente la CPU.                                                                       |
@@ -121,11 +126,11 @@ Per il calcolo servono informazioni preliminari:
 
 Abbiamo la formula per i dispositivi non terminal e terminal receiver:
 
-`commandAddr = 0x10000054 + ((IntlineNo - 3) * 0x80) + (DevNo * 0x10) + 0x4` 
+`commandAddr = 0x10000054 + ((IntlineNo - 3) * 0x80) + (DevNo * 0x10) + 0x04` 
 
 per i dispositivi terminal transmitter:
 
-`commandAddr = 0x10000054 + ((IntlineNo - 3) * 0x80) + (DevNo * 0x10) + 0x8` 
+`commandAddr = 0x10000054 + ((IntlineNo - 3) * 0x80) + (DevNo * 0x10) + 0x0C` 
 
 DevNo varia tra 0-7.
 
@@ -139,19 +144,22 @@ Andando a troncare il risultato ottenuto si ottiene `IntlineNo`.
 ### Calcolo DevNo
 Con ragionamente simile al precedente (gli offset 0x04 e 0x08 sono minori della dimensione del Device Register 0x10), sempre con troncamento:
 
-`DevNo = ((commandAddr - 0x10000054) % 0x80)`
+`DevNo = ((commandAddr - 0x10000054) % 0x80) / 0x10`
 
 ### Distinguere terminal receiver da transmitter
 Basta verificare indirizzo del comando sia riferito al campo 1 (rx) o campo 3 (tx). Contando i campi da 0. Ricordando che un campo ha dimensione 0x04.
 
 Quindi:
 - è rx se: `(commandAddr - 0x10000054) % 0x10 == 0x04`
-- è tx se: `(commandAddr - 0x10000054) % 0x10 == 0x0c`
+- è tx se: `(commandAddr - 0x10000054) % 0x10 == 0x0C`
 
+Infine con tutti i dati calcolati, e riferendoci alla tabella di assegnazione degli indici otteniamo la formula:
 
-## Ricerca processo con PId specificato
+`semIndex = ((IntlineNo - 3) * 8) + (isRx * 8) + DevNo + 1`
 
-Anche se la ricerca con `rootProcess` dovrebbe utilizzare la chiamata ricorsiva in quanto non si riesce ad avere memoria dinamica per ad esempio una pila se si vuole evitare la ricorsione.
+## Ricerca e terminazione processo con PID specificato
+
+La ricerca del processo con `rootProcess` dovrebbe utilizzare la chiamata ricorsiva in quanto non si riesce ad avere memoria dinamica per ad esempio una pila se si vuole evitare la ricorsione.
 
 ## Accumulo CPU time
 

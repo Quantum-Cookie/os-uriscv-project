@@ -241,9 +241,10 @@
 #define TPR 0x10000408 
 
 
+/* Rappresenta id del processore 0 */
+#define PROCESSOR_ID_0 0
 
-#define PROCESSOR_ID 0
-
+/* Indice del semaforo utilizzato dal Pseudo-clock nell'array di semafori dedicato ai dispositivi esterni */
 #define PSEUDO_SEMAPHORE_INDEX 0
 #endif
 
