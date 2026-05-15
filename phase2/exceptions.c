@@ -51,7 +51,7 @@ void exceptionHandler() {
         deviceInterruptHandler(cause, processorState);
     }
     else {
-        switch (GET_EXEC_CODE(cause)) {
+        switch (cause) {
             // TLB exceptions
             case 24 ... 28:
                 passUpOrDie(processorState, PGFAULTEXCEPT);

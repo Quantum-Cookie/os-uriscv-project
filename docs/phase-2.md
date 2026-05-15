@@ -170,4 +170,6 @@ Il tempo trascorso dal momento in cui il processo viene  caricato sul processore
 Invece il tempo richiesto per gli interrupt (dispositivi I/O, timer) sono considerati tempi dovuti al Nucleo stesso.
 
 
+## // Se lo stato non è READY o BUSY, il trasmettitore ha completato un'operazione
+
 ## Pass Up or Die
