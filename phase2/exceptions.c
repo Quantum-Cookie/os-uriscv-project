@@ -310,8 +310,12 @@ static void terminateProcess(state_t* processorState) {
  * @note Per vedere se il processo dopo la P e' stata bloccata o meno bisogna verificare `currentProcess`
  */
 static void pOnSem(int* semAddr, state_t* processorState) {
+    // Decremento valore semaforo
     (*semAddr)--;
+
+    // Se il valore del semaforo va negativo  
     if (*semAddr < 0) {
+        // Viene salvato il suo stato aggiornato e lo si blocca sul semaforo
         updateProcessState(processorState, currentProcess);
         insertBlocked(semAddr, currentProcess);
 

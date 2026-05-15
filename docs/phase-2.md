@@ -190,6 +190,15 @@ Per controllare se era stato la Terminal Transmitter (lo si controlla perché ha
 ACK avviene mettendo il commando ACK per il dispositivo gestito.
 
 
+## Nota sul semaforo
+In questa implementazione, il valore intero del semaforo non funge solo da indicatore di disponibilità della risorsa, ma rappresenta lo **stato della coda di attesa**:
+
+* **Valore Positivo o Zero**: Indica il numero di unità della risorsa attualmente disponibili.
+* **Valore Negativo**: Indica che la risorsa è occupata e che sono presenti processi in attesa. Il **valore assoluto** del semaforo rappresenta esattamente il numero di processi bloccati nella ASL (*Active Semaphore List*) per quel determinato semaforo.
+
+Questa scelta permette una gestione efficiente: l'operazione **V** sa di dover risvegliare un processo se e solo se, dopo l'incremento, il valore del semaforo è ancora minore o uguale a zero. Ciò elimina la necessità di contatori ausiliari esterni.
+
+
 ## Accumulo CPU time
 Il tempo trascorso dal momento in cui il processo viene  caricato sul processore fino a quando lo lascia volontariamente (tramite una SYSCALL) o involontariamente (per fine del time-slice) viene accreditato al processo stesso. Sono **considerate** anche le SYSCALL in quanto è un servizio chiesto in modo esplicito per propri scopi.
 
