@@ -101,7 +101,7 @@ Tutte le SYSCALL implementate (-1 a -10) sono progettate per essere utilizzate s
 | **-4**      | `VERHOGEN (V)`     | Esegue un'operazione V non bloccante sul semaforo all'indirizzo `a1`.                                          |
 | **-5**      | `DOIO`             | Esegue I/O sincrono scrivendo il comando `a2` all'indirizzo `a1`. Blocca il processo fino fine operazione I/O. |
 | **-6**      | `GETCPUTIME`       | Restituisce in `a0` il tempo CPU accumulato (in microsecondi) dal processo chiamante.                          |
-| **-7**      | `WAITFORCLOCK`     | Blocca il processo sulla Pseudo-clock finché non viene sbloccato dal Pseudo-clock tick (ogni 100ms).                        |
+| **-7**      | `WAITFORCLOCK`     | Blocca il processo sulla Pseudo-clock finché non viene sbloccato dal Pseudo-clock tick (ogni 100ms).           |
 | **-8**      | `GETSUPPORTPTR`    | Restituisce `p_supportStruct` del processo corrente.                                                           |
 | **-9**      | `GETPID`           | Restituisce il PID del chiamante (se `a1` è 0) o il PID del genitore.                                          |
 | **-10**     | `YIELD`            | Il processo cede volontariamente la CPU.                                                                       |
@@ -166,11 +166,11 @@ Sia la ricerca che la terminazione del processo utilizzano la ricorsione, scelta
 ## Interrupts
 La gestione segue una gerarchia di priorità: le linee con numero inferiore hanno la precedenza e, all'interno della stessa linea, il dispositivo con numero identificativo più basso viene servito per primo. Viene gestito un interrupt alla volta, se ci sono più richieste pendenti verrà rieseguito il processo per la gestione dell'interrupt.
 
-| Linea | ExcCode | Sorgente | Descrizione | 
-| :--- | :--- | :--- | :--- |
-| 1 | `7` | **PLT** | Processor Local Timer (Time Slice) | Massima |
-| 2 | `3` | **Interval Timer** | Pseudo-clock (Tick 100ms) |
-| 3-7 | `17-21` | **I/O Devices** | Disk, Flash, Network, Printer, Terminal  |
+| Linea | ExcCode | Sorgente           | Descrizione                             |
+| :---- | :------ | :----------------- | :-------------------------------------- |
+| 1     | `7`     | **PLT**            | Processor Local Timer (Time Slice)      |
+| 2     | `3`     | **Interval Timer** | Pseudo-clock (Tick 100ms)               |
+| 3-7   | `17-21` | **I/O Devices**    | Disk, Flash, Network, Printer, Terminal |
 
 ### Processor Local Timer (PLT)
 Viene usato per la **preemption**, quando scatta tale timer (ogni 5ms) il processo in esecuzione viene sospeso per poter dare la possibilità agli altri di usare la CPU.
