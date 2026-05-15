@@ -40,15 +40,17 @@ void uTLB_RefillHandler() {
 
 // Funzione handler generale delle eccezioni
 void exceptionHandler() {
+    // Legge il valore dell'exception salvato nel cause register
     unsigned int cause = getCAUSE();
     
+    // BIOS Data Page per il processore 0
+    state_t* processorState = GET_EXCEPTION_STATE_PTR(PROCESSOR_ID_0);
+
     // Verifica se l'eccezione sia un interrupt
     if (CAUSE_IS_INT(cause)) {
-        deviceInterruptHandler();
+        deviceInterruptHandler(cause, processorState);
     }
     else {
-        // BIOS Data Page per il processore 0
-        state_t* processorState = GET_EXCEPTION_STATE_PTR(PROCESSOR_ID_0);
         switch (GET_EXEC_CODE(cause)) {
             // TLB exceptions
             case 24 ... 28:

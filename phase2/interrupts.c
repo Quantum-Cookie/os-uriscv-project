@@ -7,6 +7,33 @@
 #include "initial.h"
 #include "utils.h"
 
+// Funzione handler generale delle eccezioni
+void deviceInterruptHandler(unsigned int cause, state_t* processorState) {
+
+    // Ottieni exception code
+    unsigned int excCode = GET_EXEC_CODE(cause);
+
+    switch (excCode)
+    {
+        case IL_CPUTIMER:
+            processorLocalTimerInt(processorState);
+            break;
+        case IL_TIMER:
+            intervalTimer(processorState);
+            break;
+        case IL_DISK:
+        case IL_FLASH:
+        case IL_ETHERNET:
+        case IL_PRINTER:
+        case IL_TERMINAL:
+            nonTimerInterrupts(excCode, processorState);
+            break;
+        // Non ci dovrebbe arrivare
+        default:
+            break;
+    }        
+};
+
 void processorLocalTimerInt(state_t* processorState) {
     // Acknoledge interrupt e carica il nuovo valore
     setTIMER(TIMESLICE);
@@ -81,6 +108,7 @@ void intervalTimer(state_t* processorState) {
     // Ricarica l'interval timer
     LDIT(PSECOND);
 
+    // Se c'era processo in esecuzione non gli accredita tempo gestione di tale interrupt
     if (currentProcess) {
         cpu_t actTime;
         STCK(actTime);
@@ -92,34 +120,14 @@ void intervalTimer(state_t* processorState) {
         vOnSem(&deviceSemaphore[PSEUDO_SEMAPHORE_INDEX]);
         softBlockCount--;
     }
+
+    // Se c'era processo in esecuzione quando era scattato interrupt lo fa ripartire
     if (currentProcess) {
         STCK(startRunningTime);
         LDST(processorState);
     }
+    // Altrimenti chiama lo scheduler
     else
         scheduler();
 }
 
-void deviceInterruptHandler() {
-    unsigned int excCode = GET_EXEC_CODE(getCAUSE());
-
-    state_t* processorState = GET_EXCEPTION_STATE_PTR(PROCESSOR_ID_0);
-    switch (excCode)
-    {
-        case IL_CPUTIMER:
-            processorLocalTimerInt(processorState);
-            break;
-        case IL_TIMER:
-            intervalTimer(processorState);
-            break;
-        case IL_DISK:
-        case IL_FLASH:
-        case IL_ETHERNET:
-        case IL_PRINTER:
-        case IL_TERMINAL:
-            nonTimerInterrupts(excCode, processorState);
-            break;
-        default:
-            break;
-    }        
-};
