@@ -163,13 +163,42 @@ Infine con tutti i dati calcolati, e riferendoci alla tabella di assegnazione de
 Sia la ricerca che la terminazione del processo utilizzano la ricorsione, scelta dovuta sia anche al fatto che `MAXPROC` è limitato a 20, limitando la profondità dell'albero, ma anche per una maggiore leggibilità. Se il numero di processi istanziabili fosse maggiore, l'utilizzo della ricorsione sarebbe inaccetabile e si potrebbe usare tecniche come DFS, sfruttando i puntatori `p_parent, p_child, p_sib` (si scende fino alla foglia per poi risalire). Se aumentasse molto forse risulterebbe meglio usare altre strutture dati di supporto come le hash table.
 
 
-## Accumulo CPU time
+## Interrupts
+La gestione segue una gerarchia di priorità: le linee con numero inferiore hanno la precedenza e, all'interno della stessa linea, il dispositivo con numero identificativo più basso viene servito per primo. Viene gestito un interrupt alla volta, se ci sono più richieste pendenti verrà rieseguito il processo per la gestione dell'interrupt.
 
+| Linea | ExcCode | Sorgente | Descrizione | 
+| :--- | :--- | :--- | :--- |
+| 1 | `7` | **PLT** | Processor Local Timer (Time Slice) | Massima |
+| 2 | `3` | **Interval Timer** | Pseudo-clock (Tick 100ms) |
+| 3-7 | `17-21` | **I/O Devices** | Disk, Flash, Network, Printer, Terminal  |
+
+### Processor Local Timer (PLT)
+Viene usato per la **preemption**, quando scatta tale timer (ogni 5ms) il processo in esecuzione viene sospeso per poter dare la possibilità agli altri di usare la CPU.
+ACK avviene ricaricando il PLT.
+
+### Interval Timer (Pseudo-clock)
+Scatta ogni 100ms e sblocca tutti i dispositivi che aveva fatto la richiesta di bloccarsi fino al prossimo Pseudo-clock tick.
+ACK avviene ricaricando il Interval Timer.
+
+
+### Dispositivi di I/O
+Per identificare il dispositivo specifico della classe, il Nucleus consulta la **Interrupting Devices Bit Map**.
+Per tali Interrupt è necessario restituire al processo che ha fatto richiesta dell'operazione lo status code finale (in **a0**), per i dispositivi terminal conterrà anche il carattere trasmesso/ricevuto.
+
+Per controllare se era stato la Terminal Transmitter (lo si controlla perché ha priorità maggiore) ad aver generato l'interrupt si ha usato metodo generale: se lo stato non è `UNINSTALLED` o `READY` o `BUSY`, il trasmettitore deve aver completato un'operazione.
+
+ACK avviene mettendo il commando ACK per il dispositivo gestito.
+
+
+## Accumulo CPU time
 Il tempo trascorso dal momento in cui il processo viene  caricato sul processore fino a quando lo lascia volontariamente (tramite una SYSCALL) o involontariamente (per fine del time-slice) viene accreditato al processo stesso. Sono **considerate** anche le SYSCALL in quanto è un servizio chiesto in modo esplicito per propri scopi.
 
 Invece il tempo richiesto per gli interrupt (dispositivi I/O, timer) sono considerati tempi dovuti al Nucleo stesso.
 
 
-## // Se lo stato non è READY o BUSY, il trasmettitore ha completato un'operazione
-
 ## Pass Up or Die
+La politica "Pass Up or Die" definisce il comportamento del Nucleus quando si verifica un'eccezione che non può essere gestita e dev'essere passata al Livello Supporto.
+
+Quando si verifica un'eccezione (TLB, Program Trap o SYSCALL maggiore di 1 o non permessa), il Nucleus controlla se il processo corrente ha definito una struttura per la gestione di tali eventi:
+1. **Pass Up**: Se il processo ha `p_supportStruct` **non NULL** si passa il controllo alla funzione di gestione del livello superiore.
+2. **Die**: Se non è stata definita la routine di livello superiore, il processo e tutta la sua progenie.
