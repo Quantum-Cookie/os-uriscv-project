@@ -6,6 +6,7 @@
 #include "pcb.h"
 #include "asl.h"
 
+// Scheduler preemptive round-robin basato sulla priorita' dei processi.
 void scheduler() {
     // Estrae processo da eseguire nella Ready Queue
     pcb_t* processToRun = removeProcQ(&readyQueue);

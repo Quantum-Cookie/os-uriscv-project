@@ -349,7 +349,8 @@ static void passeren(state_t* processorState) {
 
 /**
  * @brief NSYS4: Verhogen (V)
- * Effettua una V sul semaforo passato, se c'erano processi bloccati su tale semaforo verranno reinseriti in Ready Queue
+ * Effettua una V sul semaforo passato, se c'era almeno un processo bloccati su tale semaforo verra' reinserito in Ready Queue
+ * Si sbloccano i processi in ordine FIFO
  * 
  * @param processorState Puntatore allo stato del processore nel momento dell'eccezione
  */
