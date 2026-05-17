@@ -4,7 +4,7 @@
 #include "pcb.h"
 #include "asl.h"
 
-// Funzione ausiliariare per copiare struttura dati state_t
+// Funzione ausiliaria per copiare struttura dati state_t
 void copyState(state_t* src, state_t* dest) {
     dest->entry_hi = src->entry_hi;
     dest->cause = src->cause;
@@ -30,6 +30,7 @@ void updateProcessState(state_t* processorState, pcb_t* process) {
     process->p_time += actTime - startRunningTime;
 }
 
+// Funzione ausiliare per fare operazione di V su un semaforo
 pcb_t* vOnSem(int* semAddr) {
     // Incremento valore semaforo
     (*semAddr)++;

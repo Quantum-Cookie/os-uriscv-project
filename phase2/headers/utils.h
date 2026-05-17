@@ -4,6 +4,9 @@
 #include <uriscv/cpu.h>
 #include "types.h"
 
+// Restituisce (evetualmente interrupt) exception code
+#define GET_EXEC_CODE(cause) (((cause) & CAUSE_EXCCODE_MASK))
+
 /**
  * @brief Funzione ausiliare per copiare struttura dati state_t
  * 

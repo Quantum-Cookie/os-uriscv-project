@@ -24,20 +24,21 @@ void scheduler() {
         LDST(&processToRun->p_s);
     }
     else {
-        // Non ci sono piu' processi
+        // Non ci sono piu' processi, considerato buon lavoro
         if (processCount == 0)
             HALT();
         // I processi sono in attesa di operazioni I/O
         else if (processCount > 0 && softBlockCount > 0) {
-            // Disabilita l'interrupt del PLT evitando di risvegliarsi per nulla
+            // Abilita gli interrupt ma disabilita quello del PLT evitando di risvegliarsi per nulla
             setMIE(MIE_ALL & ~MIE_MTIE_MASK);
             unsigned int status = getSTATUS();
             status |= MSTATUS_MIE_MASK;
             setSTATUS(status);
 
+            // Si mette in stato di attesa fino al prossimo interrupt non PLT
             WAIT();
         }
-        // Deadlock
+        // Deadlock: processi presenti ma nessuno è pronto o in attesa di I/O
         else if (processCount > 0 && softBlockCount == 0) {
             PANIC();
         }

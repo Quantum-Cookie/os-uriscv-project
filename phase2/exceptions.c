@@ -51,7 +51,7 @@ void exceptionHandler() {
         deviceInterruptHandler(cause, processorState);
     }
     else {
-        switch (cause) {
+        switch (GET_EXEC_CODE(cause)) {
             // TLB exceptions
             case 24 ... 28:
                 passUpOrDie(processorState, PGFAULTEXCEPT);
@@ -374,12 +374,12 @@ static void verhogen(state_t* processorState) {
 static unsigned int mapDeviceSemaphoreByAddr(unsigned int addr) {
     /*** 
      * Index 0: intlineNo 2
-     * Index 1-8: intlineNo 3
-     * Index 9-16: intlineNo 4
-     * Index 17-24: intlineNo 5
-     * Index 25-32: intlineNo 6
-     * Index 33-40: intlineNo 7 - tx
-     * Index 41-48: intlineNo 7 - rx
+     * Index 1-7: intlineNo 3
+     * Index 8-15: intlineNo 4
+     * Index 16-23: intlineNo 5
+     * Index 24-31: intlineNo 6
+     * Index 32-39: intlineNo 7 - tx
+     * Index 40-47: intlineNo 7 - rx
      * 
      * La mappatura rispetta ordine di priorita', piu' basso e' piu' e' alto la priorita'. Indice 0 apparte per Pesudo-clock per facilitare la gestione
      * e una maggiore chiarezza nella mappatura, altrimenti basterebbe fare shift tutto di 1 e mettere index 0 per Pesudo-clock.

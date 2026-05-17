@@ -7,9 +7,6 @@
 #include "initial.h"
 #include "utils.h"
 
-// Restituisce l'interrupt exception code
-#define GET_INT_EXEC_CODE(cause) (((cause) & CAUSE_EXCCODE_MASK))
-
 void nonTimerInterrupts(unsigned int excCode, state_t* processorState);
 void processorLocalTimerInt(state_t* processorState);
 void intervalTimer(state_t* processorState);
@@ -18,7 +15,7 @@ void intervalTimer(state_t* processorState);
 void deviceInterruptHandler(unsigned int cause, state_t* processorState) {
 
     // Ottieni exception code
-    unsigned int excCode = GET_INT_EXEC_CODE(cause);
+    unsigned int excCode = GET_EXEC_CODE(cause);
 
     switch (excCode)
     {

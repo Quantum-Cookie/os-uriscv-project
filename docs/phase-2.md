@@ -10,19 +10,19 @@ Sono state introdotte una serie di variabili condivise tra i diversi moduli dell
 
 `struct list_head readyQueue`: Coda dei PCB ready, ovvero che possono essere scelti dallo scheduler per l'esecuzione.
 
-`pcb_t* currentProcess`: Puntatore al PCB del processo in attuale esecuzione.
+`pcb_t* currentProcess`: Puntatore al PCB del processo in attuale esecuzione. Tale puntatore viene aggiornato a `NULL` ogni volta che il processo attuale venga sospeso/terminato per evitare possibili incoerenze. 
 
 `int deviceSemaphore[NRSEMAPHORES]`: Array di interi come semaforo per ogni dispositivo esterno. Seguendo la seguente mappatura:
 
 | Index       | Device Class               | IntlineNo |
 | :---------- | :------------------------- | :-------- |
 | **0**       | Interval Timer             | 2         |
-| **1 – 8**   | Disk Devices               | 3         |
-| **9 – 16**  | Flash Devices              | 4         |
-| **17 – 24** | Network (Ethernet) Devices | 5         |
-| **25 – 32** | Printer Devices            | 6         |
-| **33 – 40** | Terminal Devices (TX)      | 7         |
-| **41 – 48** | Terminal Devices (RX)      | 7         |
+| **1 – 7**   | Disk Devices               | 3         |
+| **8 – 15**  | Flash Devices              | 4         |
+| **16 – 23** | Network (Ethernet) Devices | 5         |
+| **24 – 31** | Printer Devices            | 6         |
+| **32 – 39** | Terminal Devices (TX)      | 7         |
+| **40 – 47** | Terminal Devices (RX)      | 7         |
 
 `pcb_t* rootProcess`: Il primo processo che viene instanziato, il quale rappresenta la radice dell'intero albero dei processi.
 
@@ -31,7 +31,7 @@ Sono state introdotte una serie di variabili condivise tra i diversi moduli dell
 ## Costanti
 
 Sono state aggiunte delle costanti nel file `headers/const.h`:
-- `PROCESSOR_ID_0: 0`: Rappresenta id del processore 0. 
+- `PROCESSOR_ID_0: 0`: Rappresenta id del processore 0. Essendo un progetto monoprocessore si userà solo tale processore.
 - `PSEUDO_SEMAPHORE_INDEX: 0`: Indice del semaforo utilizzato dal Pseudo-clock nell'array di semafori dedicato ai dispositivi esterni.
 
 ## Utilità variabile `rootProcess`
@@ -69,18 +69,24 @@ Lo scheduler si occupa anche di ricaricare il `PLT` di **5ms**, e di aggiornare 
 
 Quando la coda `readyQueue` risulta vuota, in base allo stato attuale lo scheduler può:
 - Se `processCount == 0`: Viene considerato lavoro ben fatto, e invoca `HALT`.
-- Se `processCount > 0 && softBlockCount > 0`: Significa che tutti i processi sono in attesa di qualche evento, e il sistema dopo aver disattivato l'interrupt del PLT (evitando di risvegliarsi per niente) entra in `Wait State`.
+- Se `processCount > 0 && softBlockCount > 0`: Significa che tutti i processi sono in attesa di qualche evento, e il sistema dopo aver attivato gli interrupt tranne quello del PLT (evitando di risvegliarsi per niente) entra in `Wait State`.
 - Se `processCount > 0 && softBlockCount == 0`: Significa che c'è deadlock in quanto ci sono processi in attesa ma nessuno di questi sta attendendo eventi esterni, e invoca `PANIC`.
 
 
 ## Exceptions
 
-La funzione che rappresenta il handler generale delle eccezioni si deve occupare di smistare i vari casi in base al **exception code** che si ottiene tramite la funzione `getCause()`:
+La funzione che rappresenta il handler generale delle eccezioni si deve occupare di smistare i vari casi in base al **exception code** che si ottiene tramite la funzione `getCAUSE()`:
 
-- se la macro `CAUSE_IS_INT` restituisce true allora e' un **interrupt** - `deviceInterruptHandler`
-- 24-28: TLB exceptions - `passUpOrDie`
-- 8-11: SYSCALL - `syscallExceptionHandler`
-- 0-7, 9, 10, 12-23: program trap `passUpOrDie`
+- se la macro `CAUSE_IS_INT` restituisce true allora è un **interrupt** - `deviceInterruptHandler`.
+- 24-28: TLB exceptions - `passUpOrDie`.
+- 8, 11: SYSCALL - `syscallExceptionHandler`.
+- 0-7, 9, 10, 12-23: program trap `passUpOrDie`.
+
+Nel `Cause Register` il primo bit (**0x80000000**) identifica se l'exception corrente è un interrupt (1) o meno (0), come si può facilmente dedurre dalla macro fornita `CAUSE_IS_INT`. Gli altri bit rappresentano invece **l'exception code**. Quindi se non è un interrupt il valore contenuto nel Cause Register è già l'exception code. Per mantenere coerenza comunque si è deciso di usare la macro definita da noi `GET_EXEC_CODE` che semplicementa fa 
+```c
+(Valore nel Cause Register) & CAUSE_EXCCODE_MASK
+```
+con `CAUSE_EXCCODE_MASK` **0x7FFFFFFF**, anche nel caso in cui non fosse un interrupt.
 
 
 ## SYSCALL
@@ -108,7 +114,7 @@ Tutte le SYSCALL implementate (-1 a -10) sono progettate per essere utilizzate s
 
 
 ### Note
-- **Incremento del PC**: Bisogna sempre incrementare il valore del PC di 4 per i processi che non vengono terminati, evitando loop infinito di SYSCALL.
+- **Incremento del PC**: Bisogna sempre incrementare il valore del PC di 4 per i processi che non vengono terminati, evitando loop infinito di SYSCALL. Si incrementa a mano perché non è detto che ogni eccezione sia un SYSCALL, ad esempio se era un interrupt e c'era un aggiornamento automatico del PC si poteva saltare istruzioni, impossibitando la corretta esecuzione del processo.
 - **Stato del processore**: Lo stato del processo salvato nel PCB è **obsoleto** quindi nelle SYSCALL bloccanti è necessario l'aggiornamento con quello salvato nel BIOS Data Page. Naturalmente se si deve ritornare al chiamante bisogna usare lo stato alla chiamata.
 - **Valori di ritorno**: Eventuali valori di ritorno vengono posizionati nel registro `a0`.
 **Gestione SYSCALL >= 1**: Le chiamate con valore positivo in `a0` non sono gestite direttamente come servizi del Nucleus, ma seguono la politica **Pass Up or Die** verso il livello Support
@@ -202,7 +208,7 @@ Questa scelta permette una gestione efficiente: l'operazione **V** sa di dover r
 ## Accumulo CPU time
 Il tempo trascorso dal momento in cui il processo viene  caricato sul processore fino a quando lo lascia volontariamente (tramite una SYSCALL) o involontariamente (per fine del time-slice) viene accreditato al processo stesso. Sono **considerate** anche le SYSCALL in quanto è un servizio chiesto in modo esplicito per propri scopi.
 
-Invece il tempo richiesto per gli interrupt (dispositivi I/O, timer) sono considerati tempi dovuti al Nucleo stesso.
+Invece il tempo richiesto per la gestione degli interrupt (dispositivi I/O, timer) sono considerati tempi dovuti al Nucleo stesso.
 
 
 ## Pass Up or Die
@@ -210,4 +216,4 @@ La politica "Pass Up or Die" definisce il comportamento del Nucleus quando si ve
 
 Quando si verifica un'eccezione (TLB, Program Trap o SYSCALL maggiore di 1 o non permessa), il Nucleus controlla se il processo corrente ha definito una struttura per la gestione di tali eventi:
 1. **Pass Up**: Se il processo ha `p_supportStruct` **non NULL** si passa il controllo alla funzione di gestione del livello superiore.
-2. **Die**: Se non è stata definita la routine di livello superiore, il processo e tutta la sua progenie.
+2. **Die**: Se non è stata definita la routine di livello superiore, il processo e tutta la sua progenie vengono terminate.
