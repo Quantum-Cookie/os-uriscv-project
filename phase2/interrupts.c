@@ -45,7 +45,7 @@ void deviceInterruptHandler(unsigned int cause, state_t* processorState) {
  */
 void processorLocalTimerInt(state_t* processorState) {
     // Acknoledge interrupt e carica il nuovo valore
-    setTIMER(TIMESLICE);
+    setTIMER(TIMESLICE * (*((cpu_t *)TIMESCALEADDR)));
 
     // Aggiorna lo stato processo in esecuzione
     updateProcessState(processorState, currentProcess);
