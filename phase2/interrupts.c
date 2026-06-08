@@ -152,11 +152,16 @@ void intervalTimer(state_t* processorState) {
         currentProcess->p_time += actTime - startRunningTime;
     }
 
-    // Sblocca tutti i processi in attesa del pseudo-clock (V fino a 0)
-    while (deviceSemaphore[PSEUDO_SEMAPHORE_INDEX] < 0) {
-        vOnSem(&deviceSemaphore[PSEUDO_SEMAPHORE_INDEX]);
-        softBlockCount--;
-    }
+    // Sblocca tutti i processi in attesa del pseudo-clock
+    // vOnSem restituisce NULL quando non ci sono più processi bloccati (e incrementa il semaforo)
+    pcb_t* unblocked;
+    do {
+        unblocked = vOnSem(&deviceSemaphore[PSEUDO_SEMAPHORE_INDEX]);
+        if (unblocked) softBlockCount--;
+    } while (unblocked != NULL);
+
+    // L'ultima vOnSem ha incrementato il semaforo a 1 non trovando processi bloccati, lo riportiamo a 0    
+    deviceSemaphore[PSEUDO_SEMAPHORE_INDEX] = 0;
 
     // Se c'era processo in esecuzione quando era scattato interrupt lo fa ripartire
     if (currentProcess) {

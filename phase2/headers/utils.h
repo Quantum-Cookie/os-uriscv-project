@@ -28,7 +28,7 @@ void updateProcessState(state_t* processorState, pcb_t* process);
  * @brief Funzione ausiliare per fare operazione di V su un semaforo
  * 
  * @param semAddr Puntatore al semaforo su cui effettuare l'operazione
- * @return pcb_t* Puntatore all'eventuale semaforo sbloccato dall'operazione
+ * @return pcb_t* Puntatore all'eventuale semaforo sbloccato dall'operazione, NULL se non c'e' nessun processo sbloccato
  */
 pcb_t* vOnSem(int* semAddr);
 

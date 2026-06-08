@@ -32,16 +32,13 @@ void updateProcessState(state_t* processorState, pcb_t* process) {
 
 // Funzione ausiliare per fare operazione di V su un semaforo
 pcb_t* vOnSem(int* semAddr) {
-    // Incremento valore semaforo
-    (*semAddr)++;
-
-    pcb_t* readyProc = NULL;
-    // Se dopo incremento il valore del semaforo era negativo significa che c'era un processo bloccato
-    if (*semAddr <= 0) {
-        // Metto il processo sbloccato nella Ready Queue
-        readyProc = removeBlocked(semAddr);
-        if (readyProc)
-            insertProcQ(&readyQueue, readyProc);
+    // Controlla se c'e' almeno un processo bloccato 
+    pcb_t* readyProc = removeBlocked(semAddr);
+    if (readyProc) {
+        insertProcQ(&readyQueue, readyProc);
+        return readyProc;
     }
-    return readyProc;
+    // Nessun processo bloccato, incrementa il valore del semaforo
+    (*semAddr)++;
+    return NULL;
 }

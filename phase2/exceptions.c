@@ -241,8 +241,8 @@ static int recursiveTermination(pcb_t* toTerminate) {
 
         // Se era bloccato per un semaforo utente
         else
-            // Allora lo incrementa per evitare eventuali deadlock
-           (*savedSemAdd)++;
+            // Facciamo V su tale semaforo per evitare eventuali deadlock
+           vOnSem(savedSemAdd);
     } else if (toTerminate != currentProcess) {
         outProcQ(&readyQueue, toTerminate);
     }
@@ -310,12 +310,11 @@ static void terminateProcess(state_t* processorState) {
  * @note Per vedere se il processo dopo la P e' stata bloccata o meno bisogna verificare `currentProcess`
  */
 static void pOnSem(int* semAddr, state_t* processorState) {
-    // Decremento valore semaforo
-    (*semAddr)--;
-
-    // Se il valore del semaforo va negativo  
-    if (*semAddr < 0) {
-        // Viene salvato il suo stato aggiornato e lo si blocca sul semaforo
+    // Se il valore del semaforo e' maggiore di 0 lo decrementa
+    if (*semAddr > 0) {
+        (*semAddr)--;
+    // semAddr uguale a 0, blocca il processo
+    } else {
         updateProcessState(processorState, currentProcess);
         insertBlocked(semAddr, currentProcess);
 
