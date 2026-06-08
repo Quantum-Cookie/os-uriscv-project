@@ -7,6 +7,10 @@
 #include "initial.h"
 #include "utils.h"
 
+// Maschera per ottenere status dei device terminal
+#define TERMSTATMASK 0xFF
+
+
 void nonTimerInterrupts(unsigned int excCode, state_t* processorState);
 void processorLocalTimerInt(state_t* processorState);
 void intervalTimer(state_t* processorState);
@@ -98,7 +102,7 @@ void nonTimerInterrupts(unsigned int excCode, state_t* processorState) {
         termreg_t *termReg = (termreg_t *)devAddrBase;
         
         // Controllo se c'era pendente una richiesta dal Terminal Transmitter
-        if (termReg->transm_status != UNINSTALLED && termReg->transm_status != READY && termReg->transm_status != BUSY) {
+        if ((termReg->transm_status & TERMSTATMASK) == OKCHARTRANS) {
             status = termReg->transm_status;
             termReg->transm_command = ACK; 
         } 
