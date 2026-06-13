@@ -1,5 +1,5 @@
-#include "./headers/asl.h"
-#include "./headers/pcb.h"
+#include "asl.h"
+#include "pcb.h"
 
 static semd_t semd_table[MAXPROC];
 static struct list_head semdFree_h;
@@ -126,9 +126,6 @@ pcb_t *outBlocked(pcb_t *p)
             return p;
         }
 
-        // interruzione dell'iterazione se si supera il semaforo cercato
-        if (temp->s_key > p->p_semAdd)
-            break;
     }
 
     return NULL;
