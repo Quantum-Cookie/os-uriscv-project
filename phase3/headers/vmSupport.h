@@ -6,4 +6,6 @@
  * ogni elemento (frame fisico) della Swap Pool Table come libera, azzerando le associazioni
  * con le pagine logiche dei processi utente (U-proc)
  */
-static void initSwapStructs();
+void initSwapStructs();
+
+void TLBPagerHandler();

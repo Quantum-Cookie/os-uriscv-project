@@ -5,7 +5,6 @@
 #include "exceptions.h"
 #include "scheduler.h"
 
-extern void uTLB_RefillHandler();
 extern void test();
 
 // Variabili globali

@@ -2,7 +2,10 @@
 
 #define SWAP_POOL_SIZE (2 * UPROCMAX)
 
-swap_t swapPoolTable;
+// Swap Pool Table: contiene informazioni riguardante la pagina logica che occupa un cella 
+swap_t swapPoolTable[SWAP_POOL_SIZE];
+
+// Swap Pool Semaphore: serve per garantire la mutua esclusione nell'accesso della Swap Pool Table
 int swapPoolSemaphore;
 
 
@@ -13,12 +16,14 @@ void initSwapStructs() {
     
     for (int i = 0; i < SWAP_POOL_SIZE; i++) {
         /* Un ASID pari a NOPROC (-1) indica che il frame nello Swap Pool è libero */
-        swapPoolTable.sw_asid = NOPROC;
+        swapPoolTable[i].sw_asid = NOPROC;
         
         /* Inizializza il Virtual Page Number (VPN) a 0 in quanto il frame non ospita pagine */
-        swapPoolTable.sw_pageNo = 0;
+        swapPoolTable[i].sw_pageNo = 0;
         
         /* Imposta a NULL il puntatore alla Page Table Entry (PTE) */
-        swapPoolTable.sw_pte = NULL;
+        swapPoolTable[i].sw_pte = NULL;
     }
 }
+
+void TLBPagerHandler(){}

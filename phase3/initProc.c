@@ -1,6 +1,9 @@
 #include "initProc.h"
 #include "vmSupport.h"
-
+#include "const.h"
+#include "vmSupport.h"
+#include "sysSupport.h"
+#include <uriscv/liburiscv.h>
 
 /* Variabili globali */
 // Array unico per tutti i semafori di mutua esclusione dei dispositivi
@@ -15,6 +18,12 @@ int shellSemaphore = 0;
 
 /* Variabili locali */ 
 
+// Array per mantenere tutti i Support Structure disponibili
+static support_t supportStructures[8];
+
+// Indice dell'array per ottenere il prossimo Support Structure non usato
+static int nextFreeAsidIndex = 0;
+
 
 /**
  * @brief Funzione per inizializzare i semafori mutua esclusione dei dispositivi
@@ -23,8 +32,86 @@ static void initSuppSemaphores() {
     for (int i = 0; i < NSUPPSEM; i++) suppSemaphores[i] = 1;
 }
 
+
+// Visible to everyone else because it matches the header
+support_t* allocateSupportStructure(int *out_asid) {
+    if (nextFreeAsidIndex >= 8) return NULL;
+    
+    *out_asid = nextFreeAsidIndex + 1;
+    support_t *allocated_sup = &supportStructures[nextFreeAsidIndex];
+    nextFreeAsidIndex++;
+    
+    return allocated_sup; // Hand out the memory address
+}
+
+
+static void initPageTable(pteEntry_t* pageTable, int asid) {
+    for (int i = 0; i < USERPGTBLSIZE; i++) {
+        
+        // 1. Configurazione del VPN (Virtual Page Number)
+        if (i < 31) {
+            // Le prime 31 voci vanno da 0x80000 a 0x8001E
+            pageTable[i].pte_entryHI = (0x80000 + i) << VPNSHIFT;
+        } else {
+            // L'ultima voce (31) è la pagina dello stack: 0xBFFFF
+            pageTable[i].pte_entryHI = 0xBFFFF << VPNSHIFT;
+        }
+        
+        // 2. Inserimento dell'ASID nel registro EntryHI
+        pageTable[i].pte_entryHI |= asid;
+        
+        // 3. Configurazione dei bit di controllo in EntryLO (o pte_entryLO)
+        // Partiamo da zero per pulire i bit residui
+        pageTable[i].pte_entryLO = 0;
+        
+        // D (Dirty/Write-enabled) = 1 (on)
+        pageTable[i].pte_entryLO |= DIRTYON;
+        
+        // G (Global) = 0 (off) -> Non aggiungiamo nessuna maschera globale
+        // V (Valid) = 0 (off)  -> Non aggiungiamo la maschera valid (causerà Page Fault all'inizio)
+    }
+}
+
+static void initSupportStructure(support_t* supportStructure, int asid) {
+    supportStructure->sup_asid = asid;
+
+    // 0 - PGFAULTEXCEPT
+    supportStructure->sup_exceptContext[PGFAULTEXCEPT].pc = (memaddr)TLBPagerHandler;
+    supportStructure->sup_exceptContext[GENERALEXCEPT].pc = (memaddr)generalSupportHandler;
+
+    supportStructure->sup_exceptContext[PGFAULTEXCEPT].status = MSTATUS_MPIE_MASK | MSTATUS_MPP_M;
+    supportStructure->sup_exceptContext[GENERALEXCEPT].status = MSTATUS_MPIE_MASK | MSTATUS_MPP_M;
+
+    supportStructure->sup_exceptContext[PGFAULTEXCEPT].stackPtr = (memaddr)&(supportStructure->sup_stackTLB[499]);
+    supportStructure->sup_exceptContext[GENERALEXCEPT].stackPtr = (memaddr)&(supportStructure->sup_stackGen[499]);
+
+    initPageTable(supportStructure->sup_privatePgTbl, asid);
+}
+
 void test() {
+    state_t shellState;
+    
+    // 1. Inizializzazione pulita della struttura (senza sporcizia della RAM)
+    unsigned int *ptr = (unsigned int *)&shellState;
+    for (int i = 0; i < (sizeof(state_t) / sizeof(unsigned int)); i++) {
+        ptr[i] = 0;
+    }
+
+    // configura state_t per shell
+    shellState.reg_sp = USERSTACKTOP;
+    shellState.pc_epc = (memaddr)UPROCSTARTADDR;
+    shellState.status = MSTATUS_MPIE_MASK | MSTATUS_MPP_U;
+    shellState.mie = MIE_ALL;
+
+    int shellAsid;
+    support_t *shellSupport = allocateSupportStructure(&shellAsid);
+
+    shellState.entry_hi = shellAsid << ASIDSHIFT;
+
+    initSupportStructure(shellSupport, shellAsid);
+
     initSwapStructs();
     initSuppSemaphores();
+    int shellPid = SYSCALL(CREATEPROCESS, (int)&shellState, PROCESS_PRIO_LOW, (int)shellSupport);
 }
 

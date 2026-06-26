@@ -7,5 +7,7 @@
  */
 void exceptionHandler();
 
+void uTLB_RefillHandler();
+
 #endif
 
