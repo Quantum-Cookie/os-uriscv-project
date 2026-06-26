@@ -29,11 +29,31 @@ static void Yield (state_t* processorState);
 
 static void passUpOrDie(state_t* processorState, unsigned int index);
 
+/**
+ * @brief Funzione che si occupa dell'evento TLB-Refill
+ * Viene invocato quando una pagina non e' stata trovata dentro TLB (TLB-miss)
+ * 
+ */
 void uTLB_RefillHandler() {
-    setENTRYHI(0x80000000);
-    setENTRYLO(0x00000000);
+    // BIOS Data Page per il processore 0
+    state_t* processorState = GET_EXCEPTION_STATE_PTR(PROCESSOR_ID_0);
+
+    // Determina il numero di pagina (VPN) che ha causato il miss
+    unsigned int vpnMissed = ENTRYHI_GET_VPN(processorState->entry_hi);
+
+    // Se vpnMissed è lo stack (0x3FFFF) l'indice è 31, altrimenti l'indice e' gia' giusto
+    vpnMissed = vpnMissed == 0x3FFFF? 31 : vpnMissed;
+
+    // Aggiorna TLB
+    // Scrivi la entry della Page Table nei registri del TLB
+    setENTRYHI(currentProcess->p_supportStruct->sup_privatePgTbl[vpnMissed].pte_entryHI);
+    setENTRYLO(currentProcess->p_supportStruct->sup_privatePgTbl[vpnMissed].pte_entryLO);
+
+    // Inserisci l'ingresso nel TLB
     TLBWR();
-    LDST((state_t*) BIOSDATAPAGE);
+
+    // Ripristina lo stato del processore
+    LDST(processorState);
 }
 
 // Funzione handler generale delle eccezioni
