@@ -15,6 +15,7 @@ add_compile_options(-ffreestanding -static -nostartfiles -nostdlib -I${URISCV_IN
 include_directories(
     phase1/headers
     phase2/headers
+    phase3/headers
     headers 
 )
 
