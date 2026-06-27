@@ -246,5 +246,7 @@
 
 /* Indice del semaforo utilizzato dal Pseudo-clock nell'array di semafori dedicato ai dispositivi esterni */
 #define PSEUDO_SEMAPHORE_INDEX 0
+
+#define SWAP_POOL_START_ADDR 0x20000000 + (32 * PAGESIZE)
 #endif
 

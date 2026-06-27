@@ -58,14 +58,11 @@ static void initPageTable(pteEntry_t* pageTable, int asid) {
         }
         
         // 2. Inserimento dell'ASID nel registro EntryHI
-        pageTable[i].pte_entryHI |= asid;
+        pageTable[i].pte_entryHI |= asid << ASIDSHIFT;;
         
         // 3. Configurazione dei bit di controllo in EntryLO (o pte_entryLO)
-        // Partiamo da zero per pulire i bit residui
-        pageTable[i].pte_entryLO = 0;
-        
         // D (Dirty/Write-enabled) = 1 (on)
-        pageTable[i].pte_entryLO |= DIRTYON;
+        pageTable[i].pte_entryLO = DIRTYON;
         
         // G (Global) = 0 (off) -> Non aggiungiamo nessuna maschera globale
         // V (Valid) = 0 (off)  -> Non aggiungiamo la maschera valid (causerà Page Fault all'inizio)
@@ -113,5 +110,7 @@ void test() {
     initSwapStructs();
     initSuppSemaphores();
     int shellPid = SYSCALL(CREATEPROCESS, (int)&shellState, PROCESS_PRIO_LOW, (int)shellSupport);
+
+    SYSCALL(PASSEREN, (unsigned int)&masterSemaphore, 0, 0);
 }
 

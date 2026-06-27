@@ -1,1 +1,3 @@
 void generalSupportHandler();
+
+void programTrapHandler();
