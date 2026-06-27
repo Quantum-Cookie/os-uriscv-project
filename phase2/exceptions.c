@@ -29,11 +29,7 @@ static void Yield (state_t* processorState);
 
 static void passUpOrDie(state_t* processorState, unsigned int index);
 
-/**
- * @brief Funzione che si occupa dell'evento TLB-Refill
- * Viene invocato quando una pagina non e' stata trovata dentro TLB (TLB-miss)
- * 
- */
+// Funzione che si occupa dell'evento TLB-Refill
 void uTLB_RefillHandler() {
     // BIOS Data Page per il processore 0
     state_t* processorState = GET_EXCEPTION_STATE_PTR(PROCESSOR_ID_0);
