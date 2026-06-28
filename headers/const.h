@@ -249,10 +249,12 @@
 
 
 /* phase 3 */
+#define SHELL_ASID 1
 
 #define SWAP_POOL_START_ADDR 0x20000000 + (OSFRAMES * PAGESIZE)
 
 #define READTERMINAL 5
 #define EXECUTE 6
+
 #endif
 

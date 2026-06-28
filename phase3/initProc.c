@@ -33,16 +33,6 @@ static void initSuppSemaphores() {
 }
 
 
-// Visible to everyone else because it matches the header
-support_t* allocateSupportStructure(int *out_asid) {
-    if (nextFreeAsidIndex >= 8) return NULL;
-    
-    *out_asid = nextFreeAsidIndex + 1;
-    support_t *allocated_sup = &supportStructures[nextFreeAsidIndex];
-    nextFreeAsidIndex++;
-    
-    return allocated_sup; // Hand out the memory address
-}
 
 
 static void initPageTable(pteEntry_t* pageTable, int asid) {
@@ -58,7 +48,7 @@ static void initPageTable(pteEntry_t* pageTable, int asid) {
         }
         
         // 2. Inserimento dell'ASID nel registro EntryHI
-        pageTable[i].pte_entryHI |= asid << ASIDSHIFT;;
+        pageTable[i].pte_entryHI |= asid << ASIDSHIFT;
         
         // 3. Configurazione dei bit di controllo in EntryLO (o pte_entryLO)
         // D (Dirty/Write-enabled) = 1 (on)
@@ -85,7 +75,12 @@ static void initSupportStructure(support_t* supportStructure, int asid) {
     initPageTable(supportStructure->sup_privatePgTbl, asid);
 }
 
-void test() {
+support_t* allocateSupportStructure(int asid) {    
+    initSupportStructure(&supportStructures[asid - 1], asid);
+    return &supportStructures[asid - 1];
+}
+
+static void initShell() {
     state_t shellState;
     
     // 1. Inizializzazione pulita della struttura (senza sporcizia della RAM)
@@ -99,17 +94,18 @@ void test() {
     shellState.pc_epc = (memaddr)UPROCSTARTADDR;
     shellState.status = MSTATUS_MPIE_MASK | MSTATUS_MPP_U;
     shellState.mie = MIE_ALL;
+    shellState.entry_hi = SHELL_ASID << ASIDSHIFT;
 
-    int shellAsid;
-    support_t *shellSupport = allocateSupportStructure(&shellAsid);
+    support_t *shellSupport = allocateSupportStructure(SHELL_ASID);
 
-    shellState.entry_hi = shellAsid << ASIDSHIFT;
+    int shellPid = SYSCALL(CREATEPROCESS, (int)&shellState, PROCESS_PRIO_LOW, (int)shellSupport);
+}
 
-    initSupportStructure(shellSupport, shellAsid);
-
+void test() {
     initSwapStructs();
     initSuppSemaphores();
-    int shellPid = SYSCALL(CREATEPROCESS, (int)&shellState, PROCESS_PRIO_LOW, (int)shellSupport);
+
+    initShell();
 
     SYSCALL(PASSEREN, (unsigned int)&masterSemaphore, 0, 0);
 }

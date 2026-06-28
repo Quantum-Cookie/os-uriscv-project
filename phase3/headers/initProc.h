@@ -5,4 +5,6 @@ extern int suppIOMutexSemaphores[NSUPPSEM];        // Array unico per tutti i se
 extern int masterSemaphore;                 // Semaforo per evitare che InstantiatorProcess termini prima che termini la shell, garantendo che il sistema rimanga attivo
 extern int shellSemaphore;                  // Semaforo per fare si che la shell attenda la terminazione dei processi figli
 
+support_t* allocateSupportStructure(int asid);
+
 void test();

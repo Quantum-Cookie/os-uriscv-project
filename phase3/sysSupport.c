@@ -7,7 +7,6 @@
 #include <uriscv/cpu.h>
 #include <uriscv/arch.h>
 
-#define SHELL_ASID 1
 
 // Maschera per ottenere status dei device terminal
 #define TERMSTATMASK 0xFF
@@ -19,6 +18,7 @@ static void syscallHandler();
 static void terminate(support_t* sPtr);
 static void writeTerminal(support_t* sPtr);
 static void readTerminal(support_t* sPtr);
+static void execute(support_t* sPtr);
 
 void generalSupportHandler() {
     support_t *sPtr = (support_t *) SYSCALL(GETSUPPORTPTR, 0, 0, 0);
@@ -50,6 +50,7 @@ void syscallHandler() {
         readTerminal(sPtr);
         break;
     case EXECUTE:
+        execute(sPtr);
         break;
     default:
         break;
@@ -180,6 +181,53 @@ static void readTerminal(support_t* sPtr) {
     SYSCALL(VERHOGEN, (int)&(suppIOMutexSemaphores[semaphoreIndex]), 0, 0);
 }
 
+static void execute(support_t* sPtr) {
+    // Leggiamo l'ASID del processo da spawnare dal registro a1
+    int newAsid = (int)sPtr->sup_exceptState[GENERALEXCEPT].reg_a1;
+
+    // Controllo di sicurezza sull'ASID 
+    if (newAsid < 1 || newAsid > 8) {
+        return;
+    }
+
+    // Prepariamo lo state_t per il nuovo processo utente (U-proc)
+    state_t newProcessState;
+    
+    // Azzeriamo la struttura a blocchi di 32-bit per evitare dati spazzatura
+    unsigned int *ptr = (unsigned int *)&newProcessState;
+    for (int i = 0; i < (sizeof(state_t) / sizeof(unsigned int)); i++) {
+        ptr[i] = 0;
+    }
+
+    // sConfigurazione dello stato iniziale dell'U-proc da spawnare
+    newProcessState.reg_sp = USERSTACKTOP;                    // Stack virtuale standard
+    newProcessState.pc_epc = (memaddr)UPROCSTARTADDR;         // Entry point standard
+    newProcessState.status = MSTATUS_MPIE_MASK | MSTATUS_MPP_U; // User Mode con interrupt vivi
+    newProcessState.mie = MIE_ALL;
+    newProcessState.entry_hi = newAsid << ASIDSHIFT;          // ASID nel registro MMU
+
+    // Allocazione e inizializzazione della Support Structure tramite il tuo modulo
+    support_t *newSupport = allocateSupportStructure(newAsid);
+
+    // Lanciamo il nuovo processo tramite la CREATEPROCESS della Fase 2
+    // Usiamo una priorità bassa (o quella standard prevista per i tuoi U-proc)
+    int pid = SYSCALL(CREATEPROCESS, (unsigned int)&newProcessState, PROCESS_PRIO_LOW, (unsigned int)newSupport);
+
+    // Se la creazione del processo fallisce a livello di Nucleo, ritorniamo l'errore alla Shell
+    if (pid < 0) {
+        return;
+    }
+
+    // BLOCCO DELLA SHELL (Come da specifica)
+    // "During the handling of a SYS6 syscall, one can block the shell with a blocking P operation on the shellSemaphore"
+    // Eseguiamo una PASSEREN sul semaforo globale della shell. 
+    // Questo bloccherà la Shell qui dentro fino a quando il nuovo U-proc non farà una SYS2 (terminate).
+    SYSCALL(PASSEREN, (unsigned int)&shellSemaphore, 0, 0);
+
+    // Quando il processo figlio termina, qualcuno farà una V(shellSemaphore) sbloccando la Shell.
+    // Una volta ripartiti, restituiamo 0 (o il pid del figlio terminato) in reg_a0 per indicare il successo.
+    sPtr->sup_exceptState[GENERALEXCEPT].reg_a0 = 0;
+}
 
 void programTrapHandler() {
     // 1. Ottieni la struttura di supporto tramite la syscall negativa
