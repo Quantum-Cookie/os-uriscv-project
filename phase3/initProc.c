@@ -7,7 +7,7 @@
 
 /* Variabili globali */
 // Array unico per tutti i semafori di mutua esclusione dei dispositivi
-int suppSemaphores[NSUPPSEM];
+int suppIOMutexSemaphores[NSUPPSEM];
 
 // Semaforo per evitare che InstantiatorProcess termini prima che termini la shell, garantendo che il sistema rimanga attivo
 int masterSemaphore = 0;
@@ -29,7 +29,7 @@ static int nextFreeAsidIndex = 0;
  * @brief Funzione per inizializzare i semafori mutua esclusione dei dispositivi
  */
 static void initSuppSemaphores() {
-    for (int i = 0; i < NSUPPSEM; i++) suppSemaphores[i] = 1;
+    for (int i = 0; i < NSUPPSEM; i++) suppIOMutexSemaphores[i] = 1;
 }
 
 
