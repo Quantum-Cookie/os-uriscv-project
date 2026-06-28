@@ -1,12 +1,49 @@
 #include "sysSupport.h"
 #include "initProc.h"
+#include "types.h"
 
 #include <uriscv/liburiscv.h>
 #include <uriscv/cpu.h>
 
-void generalSupportHandler() {}
-
 #define SHELL_ASID 1
+
+#define GET_EXEC_CODE(cause) (((cause) & CAUSE_EXCCODE_MASK))
+
+static void syscallHandler();
+
+void generalSupportHandler() {
+    support_t *sPtr = (support_t *) SYSCALL(GETSUPPORTPTR, 0, 0, 0);
+    unsigned int cause = sPtr->sup_exceptState[GENERALEXCEPT].cause;
+    unsigned int excCode = GET_EXEC_CODE(cause);
+    
+    if (excCode == 8 || excCode == 11) {
+        // SYSCALL
+        syscallHandler(sPtr);
+    } else {
+        // Program Trap
+        programTrapHandler();
+    }
+}
+
+void syscallHandler() {
+    support_t *sPtr = (support_t *) SYSCALL(GETSUPPORTPTR, 0, 0, 0);
+
+    switch (sPtr->sup_exceptState[GENERALEXCEPT].reg_a0)
+    {
+    case TERMINATE:
+        break;
+    case WRITETERMINAL:
+        break;
+    case READTERMINAL:
+        break;
+    case EXECUTE:
+        break;
+    default:
+        break;
+    }
+}
+
+
 
 void programTrapHandler() {
     // 1. Ottieni la struttura di supporto tramite la syscall negativa
