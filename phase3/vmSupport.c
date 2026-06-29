@@ -153,9 +153,20 @@ void TLBPagerHandler() {
         unsigned int framePAddr = (SWAP_POOL_START_ADDR + (victimFrame * PAGESIZE)) >> ENTRYLO_PFN_BIT;
         sPtr->sup_privatePgTbl[vpnMissed].pte_entryLO = (framePAddr << ENTRYLO_PFN_BIT) | VALIDON | DIRTYON;
 
+        // Dopo aver aggiornato la Page Table entry del processo corrente...
         setENTRYHI(sPtr->sup_privatePgTbl[vpnMissed].pte_entryHI);
         setENTRYLO(sPtr->sup_privatePgTbl[vpnMissed].pte_entryLO);
-        TLBCLR();
+            
+        // Cerca se la entry è già nella TLB
+        TLBP();
+            
+        if ((getINDEX() & PRESENTFLAG) == 0) {
+            // Trovata: sovrascrive esattamente quella riga
+            TLBWI();
+        } else {
+            // Non trovata: inserisce in una riga casuale
+            TLBWR();
+        }
 
         setSTATUS(old_status);
 
