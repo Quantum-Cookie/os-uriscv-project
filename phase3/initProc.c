@@ -8,6 +8,8 @@
 #include <uriscv/arch.h>
 #include <uriscv/aout.h>
 
+unsigned int SWAP_POOL_START_ADDR;
+
 /* Variabili globali */
 // Array unico per tutti i semafori di mutua esclusione dei dispositivi
 int suppIOMutexSemaphores[NSUPPSEM];
@@ -127,10 +129,27 @@ static void initShell() {
     int shellPid = SYSCALL(CREATEPROCESS, (int)&shellState, PROCESS_PRIO_LOW, (int)shellSupport);
 }
 
+void initSwapPoolPosition() {
+    // Il tag AOUT si trova a RAMSTART + 1024 word (non 1025, non 0)
+    unsigned int *os_header = (unsigned int *)RAMSTART + 1024;
+
+    // L'indirizzo virtuale di inizio .data + la sua dimensione in memoria
+    // ci dà ESATTAMENTE dove finisce il kernel in memoria
+    unsigned int data_vaddr = os_header[AOUT_HE_DATA_VADDR];
+    unsigned int data_memsz = os_header[AOUT_HE_DATA_MEMSZ];
+
+    // Fine del kernel = fine del segmento .data (virtuale = fisico nel kernel PandOS)
+    unsigned int os_end = data_vaddr + data_memsz;
+
+    // L'header AOUT del kernel sta subito dopo la parte riservata al BIOS
+    SWAP_POOL_START_ADDR = (os_end + PAGESIZE - 1) & ~(PAGESIZE - 1);
+}
+
+
 void test() {
+    initSwapPoolPosition();
     initSwapStructs();
     initSuppSemaphores();
-
     initShell();
 
     SYSCALL(PASSEREN, (unsigned int)&masterSemaphore, 0, 0);
