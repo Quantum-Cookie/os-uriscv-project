@@ -180,6 +180,7 @@ static void readTerminal(support_t* sPtr) {
     SYSCALL(VERHOGEN, (int)&(suppIOMutexSemaphores[semaphoreIndex]), 0, 0);
 }
 
+extern void klog_print(char *str);
 static void execute(support_t* sPtr) {
     // Leggiamo l'ASID del processo da spawnare dal registro a1
     int newAsid = (int)sPtr->sup_exceptState[GENERALEXCEPT].reg_a1;
@@ -226,6 +227,7 @@ static void execute(support_t* sPtr) {
     // Quando il processo figlio termina, qualcuno farà una V(shellSemaphore) sbloccando la Shell.
     // Una volta ripartiti, restituiamo 0 (o il pid del figlio terminato) in reg_a0 per indicare il successo.
     sPtr->sup_exceptState[GENERALEXCEPT].reg_a0 = 0;
+    klog_print("fine");
 }
 
 void programTrapHandler() {

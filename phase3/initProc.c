@@ -3,7 +3,10 @@
 #include "const.h"
 #include "vmSupport.h"
 #include "sysSupport.h"
+
 #include <uriscv/liburiscv.h>
+#include <uriscv/arch.h>
+#include <uriscv/aout.h>
 
 /* Variabili globali */
 // Array unico per tutti i semafori di mutua esclusione dei dispositivi
@@ -21,6 +24,8 @@ int shellSemaphore = 0;
 // Array per mantenere tutti i Support Structure disponibili
 static support_t supportStructures[8];
 
+unsigned int uprocHeader[(PAGESIZE / sizeof(unsigned int))];
+
 
 /**
  * @brief Funzione per inizializzare i semafori mutua esclusione dei dispositivi
@@ -29,27 +34,28 @@ static void initSuppSemaphores() {
     for (int i = 0; i < NSUPPSEM; i++) suppIOMutexSemaphores[i] = 1;
 }
 
-static void initPageTable(pteEntry_t* pageTable, int asid) {
+static void initPageTable(pteEntry_t* pageTable, int asid, unsigned int textPages) {
     for (int i = 0; i < USERPGTBLSIZE; i++) {
-        
-        // 1. Configurazione del VPN (Virtual Page Number)
+        unsigned int vpn;
         if (i < 31) {
-            // Le prime 31 voci vanno da 0x80000 a 0x8001E
-            pageTable[i].pte_entryHI = (0x80000 + i) << VPNSHIFT;
+            vpn = 0x80000 + i;
+            pageTable[i].pte_entryHI = vpn << VPNSHIFT;
         } else {
-            // L'ultima voce (31) è la pagina dello stack: 0xBFFFF
-            pageTable[i].pte_entryHI = 0xBFFFF << VPNSHIFT;
+            vpn = 0xBFFFF;
+            pageTable[i].pte_entryHI = vpn << VPNSHIFT;
         }
-        
-        // 2. Inserimento dell'ASID nel registro EntryHI
+
         pageTable[i].pte_entryHI |= asid << ASIDSHIFT;
-        
-        // 3. Configurazione dei bit di controllo in EntryLO (o pte_entryLO)
-        // D (Dirty/Write-enabled) = 1 (on)
-        pageTable[i].pte_entryLO = DIRTYON;
-        
-        // G (Global) = 0 (off) -> Non aggiungiamo nessuna maschera globale
-        // V (Valid) = 0 (off)  -> Non aggiungiamo la maschera valid (causerà Page Fault all'inizio)
+
+        // Le prime 'textPages' sono il testo (.text).
+        // La pagina 31 (i == 31) è lo stack e deve essere sempre scrivibile (D=1).
+        if (i < textPages && i < 31) {
+            // Pagina .text: read-only (D=0)
+            pageTable[i].pte_entryLO = 0; 
+        } else {
+            // Pagina .data o stack: read-write (D=1)
+            pageTable[i].pte_entryLO = DIRTYON;
+        }
     }
 }
 
@@ -66,7 +72,33 @@ static void initSupportStructure(support_t* supportStructure, int asid) {
     supportStructure->sup_exceptContext[PGFAULTEXCEPT].stackPtr = (memaddr)&(supportStructure->sup_stackTLB[499]);
     supportStructure->sup_exceptContext[GENERALEXCEPT].stackPtr = (memaddr)&(supportStructure->sup_stackGen[499]);
 
-    initPageTable(supportStructure->sup_privatePgTbl, asid);
+    unsigned int semIndex = GET_IO_MUTEX_SEMAPHORE_INDEX(IL_FLASH, asid - 1, 0);
+
+    SYSCALL(PASSEREN, (int)&(suppIOMutexSemaphores[semIndex]), 0, 0);
+
+    // Leggi la pagina 0 del flash (contiene l'header .aout)
+    dtpreg_t *flash = (dtpreg_t *) DEV_REG_ADDR(IL_FLASH, asid - 1);
+    flash->data0 = (memaddr) uprocHeader;
+    int status = SYSCALL(DOIO, (int)&(flash->command), (0 << 8) | FLASHREAD, 0);
+
+    SYSCALL(VERHOGEN, (int)&(suppIOMutexSemaphores[semIndex]), 0, 0);
+
+    if (status != READY) {
+        // Forza comunque una configurazione standard se la flash fallisce, 
+        // giusto per vedere se è questo a far crashare tutto
+        initPageTable(supportStructure->sup_privatePgTbl, asid, 0); 
+        return;
+    }
+
+    // Calcola il numero di pagine .text
+    //unsigned int textVaddr = header[AOUT_HE_TEXT_VADDR];
+    unsigned int textMemsz = uprocHeader[AOUT_HE_TEXT_MEMSZ];
+    //unsigned int textStartPage = (textVaddr >> VPNSHIFT) & 0x1FFFF; // VPN della prima pagina .text
+    unsigned int textPages = (textMemsz + PAGESIZE - 1) / PAGESIZE;
+    //unsigned int textEndPage = textStartPage + textPages; // VPN escluso della prima pagina .data
+
+    // Passa il numero di pagine di testo
+    initPageTable(supportStructure->sup_privatePgTbl, asid, textPages);
 }
 
 support_t* allocateSupportStructure(int asid) {    

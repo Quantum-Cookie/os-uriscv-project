@@ -183,7 +183,11 @@ void TLBPagerHandler() {
 
         // Update the Current Process’s Page Table entry for page p to indicate it is now present (V bit) and occupying frame i (PFN field).
         unsigned int framePAddr = (SWAP_POOL_START_ADDR + (victimFrame * PAGESIZE)) >> ENTRYLO_PFN_BIT;
-        sPtr->sup_privatePgTbl[vpnMissed].pte_entryLO = (framePAddr << ENTRYLO_PFN_BIT) | VALIDON | DIRTYON;
+        // 2. Salva lo stato del bit Dirty originale (0 se testo, DIRTYON se dati/stack)
+        unsigned int original_dirty = (sPtr->sup_privatePgTbl[vpnMissed].pte_entryLO & DIRTYON);
+            
+        // 3. ASSEGNA pulendo completamente i vecchi dati e unendo i nuovi pezzi
+        sPtr->sup_privatePgTbl[vpnMissed].pte_entryLO = (framePAddr << ENTRYLO_PFN_BIT) | VALIDON | original_dirty;
 
         // Dopo aver aggiornato la Page Table entry del processo corrente...
         setENTRYHI(sPtr->sup_privatePgTbl[vpnMissed].pte_entryHI);
