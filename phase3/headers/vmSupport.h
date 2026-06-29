@@ -9,3 +9,5 @@
 void initSwapStructs();
 
 void TLBPagerHandler();
+
+void releaseFrames(int asid);

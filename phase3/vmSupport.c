@@ -9,17 +9,34 @@
 // Restituisce (evetualmente interrupt) exception code
 #define GET_EXEC_CODE(cause) (((cause) & CAUSE_EXCCODE_MASK))
 
-
 #define SWAP_POOL_SIZE (2 * UPROCMAX)
 
 // Swap Pool Table: contiene informazioni riguardante la pagina logica che occupa un cella 
-swap_t swapPoolTable[SWAP_POOL_SIZE];
+static swap_t swapPoolTable[SWAP_POOL_SIZE];
 
 // Swap Pool Semaphore: serve per garantire la mutua esclusione nell'accesso della Swap Pool Table
 int swapPoolSemaphore;
 
 // Questa variabile tiene traccia di quale frame allocare la prossima volta
 static int next_frame = 0;
+
+void releaseFrames(int asid) {
+    SYSCALL(PASSEREN, (int)&swapPoolSemaphore, 0, 0);
+
+    for (int i = 0; i < SWAP_POOL_SIZE; i++) {
+        if (swapPoolTable[i].sw_asid == asid) {
+            // Invalida la entry nella Page Table del processo
+            swapPoolTable[i].sw_pte->pte_entryLO &= ~VALIDON;
+            
+            // Marca il frame come libero
+            swapPoolTable[i].sw_asid = NOPROC;
+            swapPoolTable[i].sw_pageNo = 0;
+            swapPoolTable[i].sw_pte = NULL;
+        }
+    }
+
+    SYSCALL(VERHOGEN, (int)&swapPoolSemaphore, 0, 0);
+}
 
 static int replacementAlgorithm() {
     int frame_da_usare = next_frame;
@@ -156,10 +173,10 @@ void TLBPagerHandler() {
         // Dopo aver aggiornato la Page Table entry del processo corrente...
         setENTRYHI(sPtr->sup_privatePgTbl[vpnMissed].pte_entryHI);
         setENTRYLO(sPtr->sup_privatePgTbl[vpnMissed].pte_entryLO);
-            
+
         // Cerca se la entry è già nella TLB
         TLBP();
-            
+
         if ((getINDEX() & PRESENTFLAG) == 0) {
             // Trovata: sovrascrive esattamente quella riga
             TLBWI();
