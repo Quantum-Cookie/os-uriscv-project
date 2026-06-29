@@ -101,7 +101,13 @@ void TLBPagerHandler() {
         }
         
         setSTATUS(old_status); // Ripristina lo stato (Interrupt di nuovo attivi per l'I/O)
+
+
         if (swapPoolTable[victimFrame].sw_asid != NOPROC) {
+            unsigned int victimSemIndex = GET_IO_MUTEX_SEMAPHORE_INDEX(IL_FLASH, swapPoolTable[victimFrame].sw_asid - 1, 0);
+
+            SYSCALL(PASSEREN, (int)&(suppIOMutexSemaphores[victimSemIndex]), 0, 0);
+
             dtpreg_t *victim_flash = (dtpreg_t *) DEV_REG_ADDR(IL_FLASH, swapPoolTable[victimFrame].sw_asid - 1);
             victim_flash->data0 = SWAP_POOL_START_ADDR + (victimFrame * PAGESIZE);
             unsigned int write_cmd = swapPoolTable[victimFrame].sw_pageNo << 8 | FLASHWRITE;
@@ -112,9 +118,16 @@ void TLBPagerHandler() {
                 SYSCALL(VERHOGEN, (int)&swapPoolSemaphore, 0, 0);
                 programTrapHandler();
             }
-        }
-        setSTATUS(old_status & ~MSTATUS_MIE_MASK);
 
+            SYSCALL(VERHOGEN, (int)&(suppIOMutexSemaphores[victimSemIndex]), 0, 0);
+        }
+        
+
+        unsigned int readSemIndex = GET_IO_MUTEX_SEMAPHORE_INDEX(IL_FLASH, sPtr->sup_asid - 1, 0);
+
+        SYSCALL(PASSEREN, (int)&(suppIOMutexSemaphores[readSemIndex]), 0, 0);
+        
+        setSTATUS(old_status & ~MSTATUS_MIE_MASK);
         // Carica la pagina dal flash relativo al ASID
         dtpreg_t *flash_reg = (dtpreg_t *) DEV_REG_ADDR(IL_FLASH, sPtr->sup_asid - 1);
         flash_reg->data0 = SWAP_POOL_START_ADDR + (victimFrame * PAGESIZE);
@@ -122,10 +135,14 @@ void TLBPagerHandler() {
         unsigned int command = vpnMissed << 8 | FLASHREAD;
         int status = SYSCALL(DOIO, (unsigned int)&(flash_reg->command), command, 0);
 
+        SYSCALL(VERHOGEN, (int)&(suppIOMutexSemaphores[readSemIndex]), 0, 0);
+
         if (status != READY) {
             SYSCALL(VERHOGEN, (int)&swapPoolSemaphore, 0, 0);
             programTrapHandler();
         }
+
+        setSTATUS(old_status & ~MSTATUS_MIE_MASK); // Disabilita interrupt
 
         // Aggiorna Swap Pool Table
         swapPoolTable[victimFrame].sw_asid = sPtr->sup_asid;
@@ -135,8 +152,6 @@ void TLBPagerHandler() {
         // Update the Current Process’s Page Table entry for page p to indicate it is now present (V bit) and occupying frame i (PFN field).
         unsigned int framePAddr = (SWAP_POOL_START_ADDR + (victimFrame * PAGESIZE)) >> ENTRYLO_PFN_BIT;
         sPtr->sup_privatePgTbl[vpnMissed].pte_entryLO = (framePAddr << ENTRYLO_PFN_BIT) | VALIDON | DIRTYON;
-
-        setSTATUS(old_status & ~MSTATUS_MIE_MASK); // Disabilita interrupt
 
         setENTRYHI(sPtr->sup_privatePgTbl[vpnMissed].pte_entryHI);
         setENTRYLO(sPtr->sup_privatePgTbl[vpnMissed].pte_entryLO);

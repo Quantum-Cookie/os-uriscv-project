@@ -21,9 +21,6 @@ int shellSemaphore = 0;
 // Array per mantenere tutti i Support Structure disponibili
 static support_t supportStructures[8];
 
-// Indice dell'array per ottenere il prossimo Support Structure non usato
-static int nextFreeAsidIndex = 0;
-
 
 /**
  * @brief Funzione per inizializzare i semafori mutua esclusione dei dispositivi
@@ -31,9 +28,6 @@ static int nextFreeAsidIndex = 0;
 static void initSuppSemaphores() {
     for (int i = 0; i < NSUPPSEM; i++) suppIOMutexSemaphores[i] = 1;
 }
-
-
-
 
 static void initPageTable(pteEntry_t* pageTable, int asid) {
     for (int i = 0; i < USERPGTBLSIZE; i++) {

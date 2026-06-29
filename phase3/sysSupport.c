@@ -75,10 +75,6 @@ static void terminate(support_t* sPtr) {
     SYSCALL(TERMPROCESS, 0, 0, 0); 
 }
 
-static inline unsigned int getIOMutexSemaphoreIndex(unsigned int intExcCode, unsigned int devNo, unsigned int rx) {
-    return ((intExcCode - 17) * 8) + devNo + (rx * 8); 
-}
-
 static inline int isValidAddress(unsigned int addr) {
     // Controlla se l'indirizzo è nell'area Text & Data o se l'indirizzo è nell'area Stack (1) altrimenti 0
     return ((addr >= 0x80000000 && addr < 0x8001E000) || (addr >= 0xBFFFF000 && addr < 0xC0000000)) ? 1 : 0;
@@ -114,7 +110,7 @@ static void writeTerminal(support_t* sPtr) {
         }
     }
 
-    unsigned int semaphoreIndex = getIOMutexSemaphoreIndex(IL_TERMINAL, 0, 0);
+    unsigned int semaphoreIndex = GET_IO_MUTEX_SEMAPHORE_INDEX(IL_TERMINAL, 0, 0);
     SYSCALL(PASSEREN, (int)&(suppIOMutexSemaphores[semaphoreIndex]), 0, 0);
 
     termreg_t *term0reg = (termreg_t *)(DEV_REG_ADDR(IL_TERMINAL, 0));
@@ -147,7 +143,7 @@ static void readTerminal(support_t* sPtr) {
         return;
     }
 
-    unsigned int semaphoreIndex = getIOMutexSemaphoreIndex(IL_TERMINAL, 0, 1);
+    unsigned int semaphoreIndex = GET_IO_MUTEX_SEMAPHORE_INDEX(IL_TERMINAL, 0, 1);
 
     SYSCALL(PASSEREN, (int)&(suppIOMutexSemaphores[semaphoreIndex]), 0, 0);
 
