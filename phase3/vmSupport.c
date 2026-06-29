@@ -23,27 +23,43 @@ static int next_frame = 0;
 void releaseFrames(int asid) {
     SYSCALL(PASSEREN, (int)&swapPoolSemaphore, 0, 0);
 
+    unsigned int old_status = getSTATUS();
+    setSTATUS(old_status & ~MSTATUS_MIE_MASK); // interrupt OFF
+
     for (int i = 0; i < SWAP_POOL_SIZE; i++) {
         if (swapPoolTable[i].sw_asid == asid) {
-            // Invalida la entry nella Page Table del processo
-            swapPoolTable[i].sw_pte->pte_entryLO &= ~VALIDON;
-            
-            // Marca il frame come libero
+            // Cerca e invalida la entry nella TLB
+            setENTRYHI(swapPoolTable[i].sw_pte->pte_entryHI);
+            TLBP();
+            if ((getINDEX() & PRESENTFLAG) == 0) {
+                // Entry trovata: invalida settando V=0
+                setENTRYLO(0);
+                TLBWI();
+            }
+
+            // Marca il frame come libero nella swap pool
             swapPoolTable[i].sw_asid = NOPROC;
             swapPoolTable[i].sw_pageNo = 0;
             swapPoolTable[i].sw_pte = NULL;
         }
     }
 
+    setSTATUS(old_status); // interrupt ON
+
     SYSCALL(VERHOGEN, (int)&swapPoolSemaphore, 0, 0);
 }
 
 static int replacementAlgorithm() {
+    // Prima passa: cerca un frame libero (evita una FLASHWRITE)
+    for (int i = 0; i < SWAP_POOL_SIZE; i++) {
+        if (swapPoolTable[i].sw_asid == NOPROC) {
+            return i;
+        }
+    }
+
+    // Nessun frame libero: round-robin sull'intero pool
     int frame_da_usare = next_frame;
-    
-    // Aggiorna la variabile per il prossimo giro
     next_frame = (next_frame + 1) % SWAP_POOL_SIZE;
-    
     return frame_da_usare;
 }
 
@@ -144,7 +160,6 @@ void TLBPagerHandler() {
 
         SYSCALL(PASSEREN, (int)&(suppIOMutexSemaphores[readSemIndex]), 0, 0);
         
-        setSTATUS(old_status & ~MSTATUS_MIE_MASK);
         // Carica la pagina dal flash relativo al ASID
         dtpreg_t *flash_reg = (dtpreg_t *) DEV_REG_ADDR(IL_FLASH, sPtr->sup_asid - 1);
         flash_reg->data0 = SWAP_POOL_START_ADDR + (victimFrame * PAGESIZE);
