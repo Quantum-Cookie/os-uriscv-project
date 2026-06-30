@@ -20,6 +20,9 @@ int masterSemaphore = 0;
 // Semaforo per fare si che la shell attenda la terminazione dei processi figli
 int shellSemaphore = 0;
 
+// L'ultimo frame (RAMTOP - PAGESIZE .. RAMTOP) è riservato allo stack di test().
+// Le aree di stack per i Support Level handler partono subito sotto.
+#define KERNEL_STACKS_BASE (RAMTOP - 2 * PAGESIZE)
 
 /* Variabili locali */ 
 
@@ -27,6 +30,9 @@ int shellSemaphore = 0;
 static support_t supportStructures[8];
 
 unsigned int uprocHeader[(PAGESIZE / sizeof(unsigned int))];
+
+static memaddr ramTop;
+
 
 
 /**
@@ -61,6 +67,18 @@ static void initPageTable(pteEntry_t* pageTable, int asid, unsigned int textPage
     }
 }
 
+static inline memaddr kernelStacksBase() {
+    return ramTop - 2 * PAGESIZE;
+}
+
+static inline memaddr tlbStackSP(int asid) {
+    return kernelStacksBase() - (2 * (asid - 1)) * PAGESIZE;
+}
+
+static inline memaddr genStackSP(int asid) {
+    return kernelStacksBase() - (2 * (asid - 1) + 1) * PAGESIZE;
+}
+
 static void initSupportStructure(support_t* supportStructure, int asid) {
     supportStructure->sup_asid = asid;
 
@@ -71,8 +89,8 @@ static void initSupportStructure(support_t* supportStructure, int asid) {
     supportStructure->sup_exceptContext[PGFAULTEXCEPT].status = MSTATUS_MPIE_MASK | MSTATUS_MPP_M;
     supportStructure->sup_exceptContext[GENERALEXCEPT].status = MSTATUS_MPIE_MASK | MSTATUS_MPP_M;
 
-    supportStructure->sup_exceptContext[PGFAULTEXCEPT].stackPtr = (memaddr)&(supportStructure->sup_stackTLB[499]);
-    supportStructure->sup_exceptContext[GENERALEXCEPT].stackPtr = (memaddr)&(supportStructure->sup_stackGen[499]);
+    supportStructure->sup_exceptContext[PGFAULTEXCEPT].stackPtr = tlbStackSP(asid);;
+    supportStructure->sup_exceptContext[GENERALEXCEPT].stackPtr = genStackSP(asid);
 
     unsigned int semIndex = GET_IO_MUTEX_SEMAPHORE_INDEX(IL_FLASH, asid - 1, 0);
 
@@ -129,9 +147,15 @@ static void initShell() {
     int shellPid = SYSCALL(CREATEPROCESS, (int)&shellState, PROCESS_PRIO_LOW, (int)shellSupport);
 }
 
+
+static void initKernelStacksBase() {
+    RAMTOP(ramTop); // scrive il valore corrente in ramTop
+}
+
 void initSwapPoolPosition() {
     // Il tag AOUT si trova a RAMSTART + 1024 word (non 1025, non 0)
     unsigned int *os_header = (unsigned int *)RAMSTART + 1024;
+    //unsigned int *os_header = (unsigned int *)(RAMSTART + 1024 * WORD_SIZE);
 
     // L'indirizzo virtuale di inizio .data + la sua dimensione in memoria
     // ci dà ESATTAMENTE dove finisce il kernel in memoria
@@ -147,6 +171,7 @@ void initSwapPoolPosition() {
 
 
 void test() {
+    initKernelStacksBase();
     initSwapPoolPosition();
     initSwapStructs();
     initSuppSemaphores();
