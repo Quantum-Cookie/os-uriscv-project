@@ -33,6 +33,38 @@ unsigned int uprocHeader[(PAGESIZE / sizeof(unsigned int))];
 
 static memaddr ramTop;
 
+static struct list_head supportFree_h;
+
+/**
+ * @brief Estrae il primo elemento dalla free list (analogo a listRemoveFirst di pcb.c)
+ */
+static struct list_head *suppListRemoveFirst(struct list_head *head) {
+    if (list_empty(head))
+        return NULL;
+    struct list_head *toRemove = head->next;
+    list_del(toRemove);
+    return toRemove;
+}
+
+/**
+ * @brief Inizializza la free list delle Support Structures, inserendo
+ *        tutti gli elementi dell'array statico
+ */
+static void initSupportFreeList() {
+    INIT_LIST_HEAD(&supportFree_h);
+    for (int i = 0; i < 8; i++) {
+        INIT_LIST_HEAD(&(supportStructures[i].s_list));
+        list_add_tail(&(supportStructures[i].s_list), &supportFree_h);
+    }
+}
+
+/**
+ * @brief Restituisce una Support Structure alla free list
+ */
+void deallocateSupportStructure(support_t* s) {
+    if (!s) return;
+    list_add_tail(&(s->s_list), &supportFree_h);
+}
 
 
 /**
@@ -121,9 +153,14 @@ static void initSupportStructure(support_t* supportStructure, int asid) {
     initPageTable(supportStructure->sup_privatePgTbl, asid, textPages);
 }
 
-support_t* allocateSupportStructure(int asid) {    
-    initSupportStructure(&supportStructures[asid - 1], asid);
-    return &supportStructures[asid - 1];
+support_t* allocateSupportStructure(int asid) {
+    struct list_head *removed = suppListRemoveFirst(&supportFree_h);
+    if (!removed)
+        return NULL; /* nessuna struttura libera disponibile */
+
+    support_t *s = container_of(removed, support_t, s_list);
+    initSupportStructure(s, asid);
+    return s;
 }
 
 static void initShell() {
@@ -175,6 +212,7 @@ void test() {
     initSwapPoolPosition();
     initSwapStructs();
     initSuppSemaphores();
+    initSupportFreeList(); 
     initShell();
 
     SYSCALL(PASSEREN, (unsigned int)&masterSemaphore, 0, 0);
