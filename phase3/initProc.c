@@ -193,7 +193,7 @@ static void initSupportStructure(support_t* supportStructure, int asid) {
     // GENERALEXCEPT -> Support Level’s general exception handler
     supportStructure->sup_exceptContext[GENERALEXCEPT].pc = (memaddr)generalSupportHandler;
 
-    // Status con tutti gli interrupt attivi, quindi i vari handler possono essere interrotti
+    // Status con tutti gli interrupt attivi (handler interrompibili)
     supportStructure->sup_exceptContext[PGFAULTEXCEPT].status = MSTATUS_MPIE_MASK | MSTATUS_MPP_M;
     supportStructure->sup_exceptContext[GENERALEXCEPT].status = MSTATUS_MPIE_MASK | MSTATUS_MPP_M;
 
@@ -231,62 +231,94 @@ static void initSupportStructure(support_t* supportStructure, int asid) {
     initPageTable(supportStructure->sup_privatePgTbl, asid, textPages);
 }
 
+/**
+ * @brief Allocazione del Support Structure per un certo Uproc
+ * 
+ * @param asid ASID del Uproc di cui si vuole instanziare Support Structure
+ * @return support_t* puntatore al Support Structure, NULL se non ce ne sono liberi
+ */
 support_t* allocateSupportStructure(int asid) {
     struct list_head *removed = suppListRemoveFirst(&supportFree_h);
+    // Nessuna struttura libera disponibile
     if (!removed)
-        return NULL; /* nessuna struttura libera disponibile */
+        return NULL; 
 
+    // Estrapola il puntatore al Support Structure
     support_t *s = container_of(removed, support_t, s_list);
     initSupportStructure(s, asid);
     return s;
 }
 
+/**
+ * @brief Funzione che fa partire l'esecuzione della shell
+ * 
+ */
 static void initShell() {
     state_t shellState;
     
-    // 1. Inizializzazione pulita della struttura (senza sporcizia della RAM)
-    unsigned int *ptr = (unsigned int *)&shellState;
-    for (int i = 0; i < (sizeof(state_t) / sizeof(unsigned int)); i++) {
-        ptr[i] = 0;
-    }
+    // configura state_t per shell, non c'e' bisogno di pulire in quanto si vanno ad assegnare 
+    // tutti i 5 campi, tranne gpr che verra' gestito in automatico in caso d'eccezione
 
-    // configura state_t per shell
+    // Stack Pointer all'interno del kuseg
     shellState.reg_sp = USERSTACKTOP;
+    // PC punta all'inizio del segmento .text
     shellState.pc_epc = (memaddr)UPROCSTARTADDR;
+    // Eseguito in user mode con tutti gli interrupt attivi
     shellState.status = MSTATUS_MPIE_MASK | MSTATUS_MPP_U;
     shellState.mie = MIE_ALL;
     shellState.entry_hi = SHELL_ASID << ASIDSHIFT;
 
+    // Alloca la Support Structure
     support_t *shellSupport = allocateSupportStructure(SHELL_ASID);
 
+    // Creazione del processo utente (Shell) tramite il Nucleo
     int shellPid = SYSCALL(CREATEPROCESS, (int)&shellState, PROCESS_PRIO_LOW, (int)shellSupport);
+    // Se la creazione fallisce
+    if (shellPid == -1) {
+        // Errore fatale: la Shell non può partire, arrestiamo il processo di boot
+        SYSCALL(TERMPROCESS, 0, 0, 0);
+        return;
+    }
 }
 
-
-static void initKernelStacksBase() {
-    RAMTOP(ramTop); // scrive il valore corrente in ramTop
-}
-
+/**
+ * @brief Inizializza la variabile che memorizza inizio della Swap Pool
+ * 
+ */
 void initSwapPoolPosition() {
-    // Il tag AOUT si trova a RAMSTART + 1024 word (non 1025, non 0)
-    unsigned int *os_header = (unsigned int *)RAMSTART + 1024;
-    //unsigned int *os_header = (unsigned int *)(RAMSTART + 1024 * WORD_SIZE);
+    /* L'header dell'eseguibile si trova in RAM subito dopo la pagina riservata al BIOS.
+       In base a CORE_HDR_SIZE, l'indice corretto per saltare il blocco BIOS e il tag ID 
+       e' esattamente RAMSTART + 1024 word (ovvero CORE_HDR_SIZE - 1), in quanto comprende
+       anche id tag */
+    unsigned int *os_header = (unsigned int *)RAMSTART + CORE_HDR_SIZE - 1;
 
-    // L'indirizzo virtuale di inizio .data + la sua dimensione in memoria
-    // ci dà ESATTAMENTE dove finisce il kernel in memoria
+    /* Estrae l'indirizzo virtuale di inizio della sezione .data e la sua dimensione complessiva.
+       Essendo .data l'ultimo segmento dell'OS, delimita il confine superiore del codice del Kernel. */
     unsigned int data_vaddr = os_header[AOUT_HE_DATA_VADDR];
     unsigned int data_memsz = os_header[AOUT_HE_DATA_MEMSZ];
 
-    // Fine del kernel = fine del segmento .data (virtuale = fisico nel kernel PandOS)
     unsigned int os_end = data_vaddr + data_memsz;
 
-    // L'header AOUT del kernel sta subito dopo la parte riservata al BIOS
+    /* Calcola l'indirizzo di inizio dello Swap Pool eseguendo un allineamento per eccesso (Ceil) 
+       al limite della pagina fisica successiva.
+       - (os_end + PAGESIZE - 1): Spinge l'indirizzo in avanti nella pagina successiva (se non allineato).
+       - & ~(PAGESIZE - 1): Azzera i bit di offset inferiore tramite maschera bit a bit, 
+       troncando il valore all'inizio esatto della nuova pagina libera. */
     SWAP_POOL_START_ADDR = (os_end + PAGESIZE - 1) & ~(PAGESIZE - 1);
 }
 
-
+/**
+ * @brief Processo iniziatore del Support Level.
+ * Configura l'ambiente per l'esecuzione dei processi utente (U-proc):
+ * determina i limiti della RAM, calcola la posizione dello Swap Pool, 
+ * inizializza i semafori di mutua esclusione per i dispositivi di I/O 
+ * e prepara la lista delle Support Structure libere. Infine, si blocca 
+ * in attesa della terminazione della shell
+ */
 void InstantiatorProcess() {
-    initKernelStacksBase();
+    /* Recupera dall'hardware l'indirizzo fisico massimo della RAM installata 
+       e lo memorizza nella variabile ramTop. */
+    RAMTOP(ramTop); 
     initSupportStacksBase();
     initSwapPoolPosition();
     initSwapStructs();
@@ -294,6 +326,7 @@ void InstantiatorProcess() {
     initSupportFreeList(); 
     initShell();
 
+    /* Effettua una P sul masterSemaphore per bloccare questo processo.
+       Rimarrà bloccato finche' la shell non terminera' */
     SYSCALL(PASSEREN, (unsigned int)&masterSemaphore, 0, 0);
 }
-
