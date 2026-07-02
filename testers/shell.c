@@ -22,7 +22,7 @@ void main() {
 char buffer[64];
 
     // Messaggio di benvenuto stampato solo all'avvio
-    print(WRITETERMINAL, "--- Welcome to PandOS Shell ---\n");
+    print(WRITETERMINAL, "--- Welcome ---\n");
 
     while(1) {
         // Stampiamo il prompt per l'input
@@ -64,6 +64,9 @@ char buffer[64];
             }
             else if (strcmp(buffer, "calc")) {
                 SYSCALL(EXECUTE, ASID_CALC, 0, 0);
+            }
+            else if (strcmp(buffer, "help")) {
+                print(WRITETERMINAL, "Available: fibeight, echo, fibeleven, uname, date, sl, calc, exit\n");
             }
             
             // 3. Gestione comando sconosciuto
