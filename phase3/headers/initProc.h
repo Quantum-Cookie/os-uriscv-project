@@ -12,5 +12,6 @@ extern unsigned int SWAP_POOL_START_ADDR;
 support_t* allocateSupportStructure(int asid);
 
 void deallocateSupportStructure(support_t* s);
+void InstantiatorProcess();
 
 void test();

@@ -8,35 +8,41 @@
 #include <uriscv/arch.h>
 #include <uriscv/aout.h>
 
-unsigned int SWAP_POOL_START_ADDR;
-
 /* Variabili globali */
-// Array unico per tutti i semafori di mutua esclusione dei dispositivi
+// Array unico per tutti i semafori di mutua esclusione dei dispositivi I/O
 int suppIOMutexSemaphores[NSUPPSEM];
 
 // Semaforo per evitare che InstantiatorProcess termini prima che termini la shell, garantendo che il sistema rimanga attivo
 int masterSemaphore = 0;
 
-// Semaforo per fare si che la shell attenda la terminazione dei processi figli
+// Semaforo per bloccare la shell in attesa del comando di terminazione del figlio
 int shellSemaphore = 0;
 
-/* Variabili locali */ 
+// Indirizzo di inizio della Swap Pool (subito dopo i dati del sistema operativo)
+memaddr SWAP_POOL_START_ADDR;
 
-// Array per mantenere tutti i Support Structure disponibili
+/* Variabili locali */ 
+// Array per mantenere tutti i Support Structure destinate ai processi utente (U-proc)
 static support_t supportStructures[8];
 
+// Buffer della dimensione di una pagina per leggere l'header aout del U-proc e configurare l'area .text come Read-Only
 unsigned int uprocHeader[(PAGESIZE / sizeof(unsigned int))];
 
+// Memorizza ulltimo indirizzo della RAM
 static memaddr ramTop;
 
+// Testa della lista (free list) per la gestione e il riuso delle Support Structures libere
 static struct list_head supportFree_h;
 
-// L'ultimo frame (RAMTOP - PAGESIZE .. RAMTOP) è riservato allo stack di test().
-// Le aree di stack per i Support Level handler partono subito sotto.
+// Indirizzo base da cui allocare, muovendosi verso il basso, gli stack dei gestori TLB e General del Support Level
 static memaddr supportStacksBase;
+
 
 /**
  * @brief Estrae il primo elemento dalla free list (analogo a listRemoveFirst di pcb.c)
+ * 
+ * @param head Puntatore alla testa della lista degli Support Structure liberi
+ * @return struct list_head* Puntatore alla Support Structure libera, NULL se non ce sono
  */
 static struct list_head *suppListRemoveFirst(struct list_head *head) {
     if (list_empty(head))
@@ -48,7 +54,7 @@ static struct list_head *suppListRemoveFirst(struct list_head *head) {
 
 /**
  * @brief Inizializza la free list delle Support Structures, inserendo
- *        tutti gli elementi dell'array statico
+ * tutti gli elementi dell'array statico
  */
 static void initSupportFreeList() {
     INIT_LIST_HEAD(&supportFree_h);
@@ -60,12 +66,13 @@ static void initSupportFreeList() {
 
 /**
  * @brief Restituisce una Support Structure alla free list
+ * 
+ * @note Reinserisce senza pulire i campi
  */
 void deallocateSupportStructure(support_t* s) {
     if (!s) return;
     list_add_tail(&(s->s_list), &supportFree_h);
 }
-
 
 /**
  * @brief Funzione per inizializzare i semafori mutua esclusione dei dispositivi
@@ -73,6 +80,7 @@ void deallocateSupportStructure(support_t* s) {
 static void initSuppSemaphores() {
     for (int i = 0; i < NSUPPSEM; i++) suppIOMutexSemaphores[i] = 1;
 }
+
 
 static void initPageTable(pteEntry_t* pageTable, int asid, unsigned int textPages) {
     for (int i = 0; i < USERPGTBLSIZE; i++) {
@@ -99,8 +107,10 @@ static void initPageTable(pteEntry_t* pageTable, int asid, unsigned int textPage
     }
 }
 
-static inline memaddr initSupportStacksBase() {
-    supportStacksBase = ramTop - 2 * PAGESIZE;
+// L'ultimo frame (RAMTOP - PAGESIZE .. RAMTOP) è riservato allo stack di test().
+// Le aree di stack per i Support Level handler partono subito sotto.
+static inline void initSupportStacksBase() {
+    supportStacksBase = ramTop - PAGESIZE;
 }
 
 static inline memaddr tlbStackSP(int asid) {
@@ -207,7 +217,7 @@ void initSwapPoolPosition() {
 }
 
 
-void test() {
+void InstantiatorProcess() {
     initKernelStacksBase();
     initSupportStacksBase();
     initSwapPoolPosition();

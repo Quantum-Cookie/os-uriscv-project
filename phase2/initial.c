@@ -5,7 +5,7 @@
 #include "exceptions.h"
 #include "scheduler.h"
 
-extern void test();
+#include "initProc.h"
 
 // Variabili globali
 int processCount;
@@ -83,11 +83,10 @@ static void initFirstProcess(memaddr process) {
     insertProcQ(&readyQueue, firstProcess);
 }
 
-// Attualmente il primo processo e' la funzione test di p2test
 int main() {
     initPassupvector();
     initNucleusData();
-    initFirstProcess((memaddr) test);
+    initFirstProcess((memaddr) InstantiatorProcess);
     scheduler();
     return 0;
 }
