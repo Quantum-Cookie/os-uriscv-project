@@ -20,10 +20,6 @@ int masterSemaphore = 0;
 // Semaforo per fare si che la shell attenda la terminazione dei processi figli
 int shellSemaphore = 0;
 
-// L'ultimo frame (RAMTOP - PAGESIZE .. RAMTOP) è riservato allo stack di test().
-// Le aree di stack per i Support Level handler partono subito sotto.
-#define KERNEL_STACKS_BASE (RAMTOP - 2 * PAGESIZE)
-
 /* Variabili locali */ 
 
 // Array per mantenere tutti i Support Structure disponibili
@@ -34,6 +30,10 @@ unsigned int uprocHeader[(PAGESIZE / sizeof(unsigned int))];
 static memaddr ramTop;
 
 static struct list_head supportFree_h;
+
+// L'ultimo frame (RAMTOP - PAGESIZE .. RAMTOP) è riservato allo stack di test().
+// Le aree di stack per i Support Level handler partono subito sotto.
+static memaddr supportStacksBase;
 
 /**
  * @brief Estrae il primo elemento dalla free list (analogo a listRemoveFirst di pcb.c)
@@ -99,16 +99,16 @@ static void initPageTable(pteEntry_t* pageTable, int asid, unsigned int textPage
     }
 }
 
-static inline memaddr kernelStacksBase() {
-    return ramTop - 2 * PAGESIZE;
+static inline memaddr initSupportStacksBase() {
+    supportStacksBase = ramTop - 2 * PAGESIZE;
 }
 
 static inline memaddr tlbStackSP(int asid) {
-    return kernelStacksBase() - (2 * (asid - 1)) * PAGESIZE;
+    return supportStacksBase - (2 * (asid - 1)) * PAGESIZE;
 }
 
 static inline memaddr genStackSP(int asid) {
-    return kernelStacksBase() - (2 * (asid - 1) + 1) * PAGESIZE;
+    return supportStacksBase - (2 * (asid - 1) + 1) * PAGESIZE;
 }
 
 static void initSupportStructure(support_t* supportStructure, int asid) {
@@ -209,6 +209,7 @@ void initSwapPoolPosition() {
 
 void test() {
     initKernelStacksBase();
+    initSupportStacksBase();
     initSwapPoolPosition();
     initSwapStructs();
     initSuppSemaphores();
