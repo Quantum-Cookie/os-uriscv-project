@@ -18,7 +18,7 @@ int masterSemaphore = 0;
 // Semaforo per bloccare la shell in attesa del comando di terminazione del figlio
 int shellSemaphore = 0;
 
-// Indirizzo di inizio della Swap Pool (subito dopo i dati del sistema operativo)
+// Indirizzo di inizio della Swap Pool (subito dopo area del sistema operativo)
 memaddr SWAP_POOL_START_ADDR;
 
 
@@ -312,8 +312,8 @@ void initSwapPoolPosition() {
  * Configura l'ambiente per l'esecuzione dei processi utente (U-proc):
  * determina i limiti della RAM, calcola la posizione dello Swap Pool, 
  * inizializza i semafori di mutua esclusione per i dispositivi di I/O 
- * e prepara la lista delle Support Structure libere. Infine, si blocca 
- * in attesa della terminazione della shell
+ * e prepara la lista delle Support Structure libere. Infine, fa partire
+ * shell si blocca in attesa della sua terminazione 
  */
 void InstantiatorProcess() {
     /* Recupera dall'hardware l'indirizzo fisico massimo della RAM installata 
