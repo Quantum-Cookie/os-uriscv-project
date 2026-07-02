@@ -1,3 +1,6 @@
+#ifndef INITPROC_H
+#define INITPROC_H
+
 #include "types.h"
 
 #define GET_IO_MUTEX_SEMAPHORE_INDEX(intExcCode, devNo, rx) (((intExcCode - 17) * 8) + devNo + (rx * 8))
@@ -15,3 +18,5 @@ void deallocateSupportStructure(support_t* s);
 void InstantiatorProcess();
 
 void test();
+
+#endif

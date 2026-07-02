@@ -1,3 +1,6 @@
+#ifndef VMSUPPORT_H
+#define VMSUPPORT_H
+
 #include "types.h"
 
 /**
@@ -11,3 +14,5 @@ void initSwapStructs();
 void TLBPagerHandler();
 
 void releaseFrames(int asid);
+
+#endif
