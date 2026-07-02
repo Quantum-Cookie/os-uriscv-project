@@ -21,12 +21,16 @@ int shellSemaphore = 0;
 // Indirizzo di inizio della Swap Pool (subito dopo i dati del sistema operativo)
 memaddr SWAP_POOL_START_ADDR;
 
+
 /* Variabili locali */ 
 // Array per mantenere tutti i Support Structure destinate ai processi utente (U-proc)
 static support_t supportStructures[8];
 
 // Buffer della dimensione di una pagina per leggere l'header aout del U-proc e configurare l'area .text come Read-Only
-unsigned int uprocHeader[(PAGESIZE / sizeof(unsigned int))];
+static unsigned int uprocHeader[(PAGESIZE / sizeof(unsigned int))];
+
+// Semaforo per mutua esclusione su tale variabile
+static int uprocHeaderSemaphore = 1;
 
 // Memorizza ulltimo indirizzo della RAM
 static memaddr ramTop;
@@ -38,6 +42,7 @@ static struct list_head supportFree_h;
 static memaddr supportStacksBase;
 
 
+
 /**
  * @brief Estrae il primo elemento dalla free list (analogo a listRemoveFirst di pcb.c)
  * 
@@ -45,10 +50,14 @@ static memaddr supportStacksBase;
  * @return struct list_head* Puntatore alla Support Structure libera, NULL se non ce sono
  */
 static struct list_head *suppListRemoveFirst(struct list_head *head) {
+    // Controllo per vedere se la lista e' vuota o meno
     if (list_empty(head))
         return NULL;
+    
+    // Rimuove primo elemento della lista e pulisce i suoi campi di list_head
     struct list_head *toRemove = head->next;
     list_del(toRemove);
+
     return toRemove;
 }
 
@@ -58,6 +67,9 @@ static struct list_head *suppListRemoveFirst(struct list_head *head) {
  */
 static void initSupportFreeList() {
     INIT_LIST_HEAD(&supportFree_h);
+
+    /* Inizializzazione dei puntatori della lista interna al Support Structure 
+    e inserimento del Support Structure corrente nella lista dei Support Structure liberi */
     for (int i = 0; i < 8; i++) {
         INIT_LIST_HEAD(&(supportStructures[i].s_list));
         list_add_tail(&(supportStructures[i].s_list), &supportFree_h);
@@ -65,7 +77,7 @@ static void initSupportFreeList() {
 }
 
 /**
- * @brief Restituisce una Support Structure alla free list
+ * @brief Reinserisce la Support Structure alla free list
  * 
  * @note Reinserisce senza pulire i campi
  */
@@ -74,92 +86,148 @@ void deallocateSupportStructure(support_t* s) {
     list_add_tail(&(s->s_list), &supportFree_h);
 }
 
+
 /**
- * @brief Funzione per inizializzare i semafori mutua esclusione dei dispositivi
+ * @brief Funzione per inizializzare i semafori di mutua esclusione dei dispositivi
+ * Imposta a 1 (libero) tutti i semafori nell'array suppIOMutexSemaphores
  */
 static void initSuppSemaphores() {
     for (int i = 0; i < NSUPPSEM; i++) suppIOMutexSemaphores[i] = 1;
 }
 
-
+/**
+ * @brief Inizializza la Page Table del Uproc
+ * 
+ * @param pageTable Puntatore alla Page Table privata
+ * @param asid ASID relativo al Uproc
+ * @param textPages Il numero di pagine .text (da mettere in read only)
+ */
 static void initPageTable(pteEntry_t* pageTable, int asid, unsigned int textPages) {
     for (int i = 0; i < USERPGTBLSIZE; i++) {
+        /* Configurazione del EntryHI*/
         unsigned int vpn;
+        
+        // i primi 31 pagine sono per .text e .data con VPN (Virtual Page Number) vanno da 0x80000 a 0x8001E
         if (i < 31) {
             vpn = 0x80000 + i;
             pageTable[i].pte_entryHI = vpn << VPNSHIFT;
-        } else {
+        } 
+        // La 32-esima pagina e' per lo stack con VPN 0xBFFFF
+        else {
             vpn = 0xBFFFF;
             pageTable[i].pte_entryHI = vpn << VPNSHIFT;
         }
 
+        // Inserimento ASID
         pageTable[i].pte_entryHI |= asid << ASIDSHIFT;
 
-        // Le prime 'textPages' sono il testo (.text).
-        // La pagina 31 (i == 31) è lo stack e deve essere sempre scrivibile (D=1).
+        /* configurazione del EntryLO */
+
+        // All'inizializzazione le pagine non sono valide (Valid bit = 0) e non hanno un frame fisico associato.
+        // Impostiamo solo il bit Dirty (D) per determinare se la pagina sarà modificabile o meno:
+        // - Pagine .text (i < textPages): Read-Only -> Bit D = 0
+        // - Pagine .data o Stack (i == 31): Read-Write -> Bit D = 1 (DIRTYON)
         if (i < textPages && i < 31) {
-            // Pagina .text: read-only (D=0)
+            // Segmento di testo protetto da scrittura
             pageTable[i].pte_entryLO = 0; 
         } else {
-            // Pagina .data o stack: read-write (D=1)
+            // Segmento dati o stack modificabile
             pageTable[i].pte_entryLO = DIRTYON;
         }
     }
 }
 
-// L'ultimo frame (RAMTOP - PAGESIZE .. RAMTOP) è riservato allo stack di test().
-// Le aree di stack per i Support Level handler partono subito sotto.
+
+/**
+ * @brief Inizializza la base per gli stack del Support Level.
+ * L'ultimo frame di RAM (da RAMTOP - PAGESIZE a RAMTOP) è strettamente 
+ * riservato allo stack del processo InstantiatorProcess(). Le aree di stack per gli 
+ * handler del Support Level vengono posizionate immediatamente al di sotto.
+ */
 static inline void initSupportStacksBase() {
+    // L'ultimo frame (RAMTOP - PAGESIZE .. RAMTOP) è riservato allo stack di InstantiatorProcess().
+    // Le aree di stack per i Support Level handler partono subito sotto.
     supportStacksBase = ramTop - PAGESIZE;
 }
 
+/**
+ * @brief Restituisce il valore iniziale dello Stack Pointer (SP) per il TLB exception handler.
+ * Poiché lo stack cresce verso il basso, lo SP deve puntare alla fine (limite superiore)
+ * della pagina fisica allocata. Ogni U-proc ha a disposizione 2 frame dedicati; 
+ * al TLB handler viene assegnato il primo frame a partire dall'alto.
+ * 
+ * @param asid ASID del Uproc a cui si sta assegnado lo stack
+ * @return memaddr Indirizzo iniziale dello Stack Pointer (fine della pagina)
+ */
 static inline memaddr tlbStackSP(int asid) {
+    // 2 Frame per un Uproc, al TLB exception handler va il primo a partire dall'alto (piu' in alto)
     return supportStacksBase - (2 * (asid - 1)) * PAGESIZE;
 }
 
+/**
+ * @brief Restituisce il valore iniziale dello Stack Pointer (SP) per il General exception handler.
+ * Poiché lo stack cresce verso il basso, lo SP deve puntare alla fine (limite superiore)
+ * della pagina fisica allocata. Ogni U-proc ha a disposizione 2 frame dedicati;
+ * al General handler viene assegnato il secondo frame a partire dall'alto.
+ * 
+ * @param asid ASID del Uproc a cui si sta assegnado lo stack
+ * @return memaddr Indirizzo iniziale dello Stack Pointer (fine della pagina)
+ */
 static inline memaddr genStackSP(int asid) {
+    // 2 Frame per un Uproc, al General exception handler va il secondo a partire dall'alto (piu' in basso)
     return supportStacksBase - (2 * (asid - 1) + 1) * PAGESIZE;
 }
 
+/**
+ * @brief Inizializzazione della Support Structure
+ * 
+ * @param supportStructure Puntatore al Support Structure da inizializzare
+ * @param asid ASID del Uproc a cui e' destinato tale Support Structure
+ */
 static void initSupportStructure(support_t* supportStructure, int asid) {
     supportStructure->sup_asid = asid;
 
-    // 0 - PGFAULTEXCEPT
+    // Inizializzazione del PC per i vari handler
+    // PGFAULTEXCEPT -> Support Level’s TLB handler
     supportStructure->sup_exceptContext[PGFAULTEXCEPT].pc = (memaddr)TLBPagerHandler;
+    // GENERALEXCEPT -> Support Level’s general exception handler
     supportStructure->sup_exceptContext[GENERALEXCEPT].pc = (memaddr)generalSupportHandler;
 
+    // Status con tutti gli interrupt attivi, quindi i vari handler possono essere interrotti
     supportStructure->sup_exceptContext[PGFAULTEXCEPT].status = MSTATUS_MPIE_MASK | MSTATUS_MPP_M;
     supportStructure->sup_exceptContext[GENERALEXCEPT].status = MSTATUS_MPIE_MASK | MSTATUS_MPP_M;
 
-    supportStructure->sup_exceptContext[PGFAULTEXCEPT].stackPtr = tlbStackSP(asid);;
+    // Stack pointer dei rispettivi handler
+    supportStructure->sup_exceptContext[PGFAULTEXCEPT].stackPtr = tlbStackSP(asid);
     supportStructure->sup_exceptContext[GENERALEXCEPT].stackPtr = genStackSP(asid);
 
+    
+    /* Lettura sul flash relativo a tale ASID per ottenere header di tale Uproc */
     unsigned int semIndex = GET_IO_MUTEX_SEMAPHORE_INDEX(IL_FLASH, asid - 1, 0);
 
+    // Acquisizione semafori per Flash e Buffer comune per header
     SYSCALL(PASSEREN, (int)&(suppIOMutexSemaphores[semIndex]), 0, 0);
-
-    // Leggi la pagina 0 del flash (contiene l'header .aout)
+    SYSCALL(PASSEREN, (int)&(uprocHeaderSemaphore), 0, 0);
+    
+    // Leggi la pagina 0 del flash (contiene l'header)
     dtpreg_t *flash = (dtpreg_t *) DEV_REG_ADDR(IL_FLASH, asid - 1);
     flash->data0 = (memaddr) uprocHeader;
     int status = SYSCALL(DOIO, (int)&(flash->command), (0 << 8) | FLASHREAD, 0);
 
-    SYSCALL(VERHOGEN, (int)&(suppIOMutexSemaphores[semIndex]), 0, 0);
+    unsigned int textPages = 0;
 
-    if (status != READY) {
-        // Forza comunque una configurazione standard se la flash fallisce, 
-        // giusto per vedere se è questo a far crashare tutto
-        initPageTable(supportStructure->sup_privatePgTbl, asid, 0); 
-        return;
+    // Se la lettura hardware è riuscita, estraiamo subito il dato dal buffer comune
+    if (status == READY) {
+        unsigned int textMemsz = uprocHeader[AOUT_HE_TEXT_MEMSZ];
+        // Sovrastima per avere il Ceil delle pagine .text
+        textPages = (textMemsz + PAGESIZE - 1) / PAGESIZE;
     }
 
-    // Calcola il numero di pagine .text
-    //unsigned int textVaddr = header[AOUT_HE_TEXT_VADDR];
-    unsigned int textMemsz = uprocHeader[AOUT_HE_TEXT_MEMSZ];
-    //unsigned int textStartPage = (textVaddr >> VPNSHIFT) & 0x1FFFF; // VPN della prima pagina .text
-    unsigned int textPages = (textMemsz + PAGESIZE - 1) / PAGESIZE;
-    //unsigned int textEndPage = textStartPage + textPages; // VPN escluso della prima pagina .data
+    // Rilascio dei semafori
+    SYSCALL(VERHOGEN, (int)&(uprocHeaderSemaphore), 0, 0);
+    SYSCALL(VERHOGEN, (int)&(suppIOMutexSemaphores[semIndex]), 0, 0);
 
-    // Passa il numero di pagine di testo
+    // Inizializza la Page Table privata (se status != READY, textPages sarà 0 e tutte le pagine saranno writable)
     initPageTable(supportStructure->sup_privatePgTbl, asid, textPages);
 }
 
