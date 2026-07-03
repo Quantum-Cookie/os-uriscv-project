@@ -266,6 +266,8 @@ static void initShell() {
     // Eseguito in user mode con tutti gli interrupt attivi
     shellState.status = MSTATUS_MPIE_MASK | MSTATUS_MPP_U;
     shellState.mie = MIE_ALL;
+    
+    // Inserimento ASID in EntryHI
     shellState.entry_hi = SHELL_ASID << ASIDSHIFT;
 
     // Alloca la Support Structure

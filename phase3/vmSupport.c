@@ -6,7 +6,7 @@
 #include <uriscv/cpu.h>
 #include <uriscv/arch.h>
 
-// Estrae il codice dell'eccezione dal registro Cause
+// Estrae il codice dell'eccezione
 #define GET_EXEC_CODE(cause) (((cause) & CAUSE_EXCCODE_MASK))
 
 // Dimensione della Swap Pool
