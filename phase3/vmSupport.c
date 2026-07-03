@@ -6,89 +6,124 @@
 #include <uriscv/cpu.h>
 #include <uriscv/arch.h>
 
-// Restituisce (evetualmente interrupt) exception code
+// Estrae il codice dell'eccezione dal registro Cause
 #define GET_EXEC_CODE(cause) (((cause) & CAUSE_EXCCODE_MASK))
 
+// Dimensione della Swap Pool
 #define SWAP_POOL_SIZE (2 * UPROCMAX)
 
-// Swap Pool Table: contiene informazioni riguardante la pagina logica che occupa un cella 
+// Swap Pool Table: contiene le informazioni riguardanti la pagina logica che occupa una cella (frame).
 static swap_t swapPoolTable[SWAP_POOL_SIZE];
 
 // Swap Pool Semaphore: serve per garantire la mutua esclusione nell'accesso della Swap Pool Table
-int swapPoolSemaphore;
+static int swapPoolSemaphore;
 
-// Questa variabile tiene traccia di quale frame allocare la prossima volta
-static int next_frame = 0;
 
+/**
+ * @brief Marca i frame del Uproc nella Swap Pool con ASID passato come liberi e ne pulisce i campi relativi
+ * 
+ * @param asid ASID del Uproc di cui si deve liberare i relativi frame nella Swap Pool
+ */
 void releaseFrames(int asid) {
+    // Ottieni semaforo per accedere alla Swap Pool Table in mutua esclusione
     SYSCALL(PASSEREN, (int)&swapPoolSemaphore, 0, 0);
 
-    unsigned int old_status = getSTATUS();
-    setSTATUS(old_status & ~MSTATUS_MIE_MASK); // interrupt OFF
-
+    // Cerca nella Swap Pool Table i frame associati ad tale ASID
     for (int i = 0; i < SWAP_POOL_SIZE; i++) {
         if (swapPoolTable[i].sw_asid == asid) {
+            /* Disattiva gli interrupt per aggiornamento atomico della Swap Pool Table e del TLB */
+            unsigned int old_status = getSTATUS();
+            setSTATUS(old_status & ~MSTATUS_MIE_MASK); 
+            
             // Cerca e invalida la entry nella TLB
             setENTRYHI(swapPoolTable[i].sw_pte->pte_entryHI);
             TLBP();
+            // Entry trovata: invalida settando V=0
             if ((getINDEX() & PRESENTFLAG) == 0) {
-                // Entry trovata: invalida settando V=0
                 setENTRYLO(0);
                 TLBWI();
             }
 
-            // Marca il frame come libero nella swap pool
+            // Marca il frame come libero nella Swap Pool Table
             swapPoolTable[i].sw_asid = NOPROC;
             swapPoolTable[i].sw_pageNo = 0;
             swapPoolTable[i].sw_pte = NULL;
+
+            // Riablilita gli interrupt
+            setSTATUS(old_status);
         }
     }
 
-    setSTATUS(old_status); // interrupt ON
-
+    // Rilascio semaforo per accedere alla Swap Pool Table in mutua esclusione
     SYSCALL(VERHOGEN, (int)&swapPoolSemaphore, 0, 0);
 }
 
+/**
+ * @brief Algoritmo di rimpiazzamento delle pagine (Page Replacement). 
+ * Cerca prima se ci sono frame liberi nella Swap Pool Table. Se tutti i 
+ * frame sono occupati, seleziona una pagina vittima usando una strategia Round Robin.
+ * 
+ * @note Deve essere chiamata all'interno di una sezione critica protetta da swapPoolSemaphore.
+ * @return int Indice del frame selezionato nella Swap Pool Table (valore tra 0 e SWAP_POOL_SIZE-1)
+ */
 static int replacementAlgorithm() {
-    // Prima passa: cerca un frame libero (evita una FLASHWRITE)
+    // Variabile che tiene traccia di quale sara' la prossima pagina vittima se non ci sono frame liberi
+    static int next_frame = 0;
+
+    // Cerca se esiste un frame libero
     for (int i = 0; i < SWAP_POOL_SIZE; i++) {
         if (swapPoolTable[i].sw_asid == NOPROC) {
             return i;
         }
     }
 
-    // Nessun frame libero: round-robin sull'intero pool
-    int frame_da_usare = next_frame;
+    // Se non c'e' nessun frame libero, usa round-robin sull'intero pool
+    int victim_frame = next_frame;
     next_frame = (next_frame + 1) % SWAP_POOL_SIZE;
-    return frame_da_usare;
+    return victim_frame;
 }
 
-// Funzione per inizializzare Inizializza le strutture dati dello Swap Pool
+/**
+ * @brief Inizializza le strutture dati dello Swap Pool
+ * Imposta il semaforo dello Swap Pool per garantire la mutua esclusione e configura
+ * ogni elemento (frame fisico) della Swap Pool Table come libera, azzerando le associazioni
+ * con le pagine logiche dei processi utente (U-proc)
+ */
 void initSwapStructs() {
-    /* Inizializza il semaforo di mutua esclusione dello Swap Pool a 1 */
+    // Inizializza il semaforo di mutua esclusione dello Swap Pool a 1
     swapPoolSemaphore = 1;
     
     for (int i = 0; i < SWAP_POOL_SIZE; i++) {
-        /* Un ASID pari a NOPROC (-1) indica che il frame nello Swap Pool è libero */
+        // Un ASID pari a NOPROC (-1) indica che il frame nello Swap Pool è libero 
         swapPoolTable[i].sw_asid = NOPROC;
         
-        /* Inizializza il Virtual Page Number (VPN) a 0 in quanto il frame non ospita pagine */
+        // Inizializza il Virtual Page Number (VPN) a 0 in quanto il frame non ospita pagine
         swapPoolTable[i].sw_pageNo = 0;
         
-        /* Imposta a NULL il puntatore alla Page Table Entry (PTE) */
+        // Imposta a NULL il puntatore alla Page Table Entry (PTE) 
         swapPoolTable[i].sw_pte = NULL;
     }
 }
 
+/**
+ * @brief Pager: si occupa di caricare nella Swap Pool la pagina richiesta
+ * 
+ * Questa funzione viene invocata quando si verifica un'eccezione di tipo TLB-Invalid
+ * (sia su operazione di lettura TLBL, sia di scrittura TLBS). Il suo compito è caricare
+ * in RAM (nello Swap Pool) la pagina logica mancante recuperandola dal dispositivo Flash
+ * associato all'U-proc corrente.
+ */
 void TLBPagerHandler() {
     // Ottiene il puntatore al Support Structure del processo corrente
     support_t *sPtr = (support_t *)SYSCALL(GETSUPPORTPTR, 0, 0, 0);
 
     unsigned int cause = sPtr->sup_exceptState[PGFAULTEXCEPT].cause;
 
+    // Se era avvenuto un TLB-Modification exception
     if (GET_EXEC_CODE(cause) == EXC_MOD) {
         programTrapHandler();
     }
+    // Altrimenti e' avvenuto un page fault su load/store operation
     else {
         // Mutua esclusione nell'accesso della Swap Pool Table
         SYSCALL(PASSEREN, (int)&swapPoolSemaphore, 0, 0);
@@ -101,15 +136,20 @@ void TLBPagerHandler() {
 
         unsigned int victimFrame = replacementAlgorithm();
 
+        // Memorizza il vecchio status
         unsigned int old_status;
         old_status = getSTATUS();
-        setSTATUS(old_status & ~MSTATUS_MIE_MASK); // Disabilita interrupt
 
         // Verifica se il frame era gia' occupata 
         if (swapPoolTable[victimFrame].sw_asid != NOPROC) {
-            // Il puntatore alla entry della Page Table del processo VITTIMA
+
+            /* Aggiornamento atomico del TLB */
+            setSTATUS(old_status & ~MSTATUS_MIE_MASK); 
+
+            // Il puntatore alla entry della Page Table del processo vittima
             pteEntry_t* victimPte = swapPoolTable[victimFrame].sw_pte;
 
+            // Invalida tale pagina
             victimPte->pte_entryLO &= ~VALIDON;
 
             // Configura EntryHi con la pagina logica (VPN) e l'ASID da cercare
@@ -118,35 +158,38 @@ void TLBPagerHandler() {
             // Lancia il Probe hardware nella TLB
             TLBP();
 
-            // Verifica il registro INDEX.
-            // Se la pagina NON è in cache, il bit 'P' (Probe Failure) del registro Index viene impostato a 1.
-            // Se la pagina È in cache, il bit 'P' è 0 e il resto del registro contiene l'indice esatto (0, 1, 2...).
-
+            // Verifica il registro INDEX
+            // Se la pagina NON e' in cache, il bit 'P' del registro Index viene impostato a 1
             if ((getINDEX() & PRESENTFLAG) == 0) {
-                // La pagina ERA IN CACHE (nella TLB)!
-                // Index.P è 0, quindi getINDEX() restituisce la posizione hardware della riga. 
+                // La pagina nella TLB
 
-                // Aggiornamento TLB
-                setENTRYHI(victimPte->pte_entryHI);
+                // Aggiornamento TLB invalidando tale pagina
                 setENTRYLO(victimPte->pte_entryLO);
-                TLBWI(); // Sovrascrive la riga indicata dal registro Index 
+                // Sovrascrive la riga indicata dal registro Index 
+                TLBWI(); 
             }
+
+            // Ripristina lo stato (Interrupt di nuovo attivi per l'I/O)
+            setSTATUS(old_status);
         }
-        
-        setSTATUS(old_status); // Ripristina lo stato (Interrupt di nuovo attivi per l'I/O)
 
 
-        if (swapPoolTable[victimFrame].sw_asid != NOPROC) {
+        // Se il frame era occupato e il Dirty Bit era ON allora lo salva nel flash rispettivo
+        if (swapPoolTable[victimFrame].sw_asid != NOPROC && (swapPoolTable[victimFrame].sw_pte->pte_entryLO & DIRTYON) != 0) {
+
+            /* Ottieni semaforo per il dispositivo Flash su cui bisogna memorizzare la pagina */
             unsigned int victimSemIndex = GET_IO_MUTEX_SEMAPHORE_INDEX(IL_FLASH, swapPoolTable[victimFrame].sw_asid - 1, 0);
 
             SYSCALL(PASSEREN, (int)&(suppIOMutexSemaphores[victimSemIndex]), 0, 0);
 
+            /* Scrittura nel flash nel blocco giusto (VPN) */
             dtpreg_t *victim_flash = (dtpreg_t *) DEV_REG_ADDR(IL_FLASH, swapPoolTable[victimFrame].sw_asid - 1);
             victim_flash->data0 = SWAP_POOL_START_ADDR + (victimFrame * PAGESIZE);
             unsigned int write_cmd = swapPoolTable[victimFrame].sw_pageNo << 8 | FLASHWRITE;
 
             int wstatus = SYSCALL(DOIO, (unsigned int)&(victim_flash->command), write_cmd, 0);
             
+            // Se l'operazione di scrittura era fallita invoca Program Trap
             if (wstatus != READY) {
                 SYSCALL(VERHOGEN, (int)&swapPoolSemaphore, 0, 0);
                 programTrapHandler();
@@ -156,6 +199,7 @@ void TLBPagerHandler() {
         }
         
 
+        /* Ottieni semaforo per il dispositivo Flash da cui bisogna caricare la pagina */
         unsigned int readSemIndex = GET_IO_MUTEX_SEMAPHORE_INDEX(IL_FLASH, sPtr->sup_asid - 1, 0);
 
         SYSCALL(PASSEREN, (int)&(suppIOMutexSemaphores[readSemIndex]), 0, 0);
@@ -169,45 +213,53 @@ void TLBPagerHandler() {
 
         SYSCALL(VERHOGEN, (int)&(suppIOMutexSemaphores[readSemIndex]), 0, 0);
 
+        // Se l'operazione di lettura era fallita invoca Program Trap
         if (status != READY) {
             SYSCALL(VERHOGEN, (int)&swapPoolSemaphore, 0, 0);
             programTrapHandler();
         }
 
-        setSTATUS(old_status & ~MSTATUS_MIE_MASK); // Disabilita interrupt
+        /* Disabilita interrupt per aggiornare la Swap Pool Table in modo atomico */  
+        setSTATUS(old_status & ~MSTATUS_MIE_MASK); 
 
         // Aggiorna Swap Pool Table
         swapPoolTable[victimFrame].sw_asid = sPtr->sup_asid;
         swapPoolTable[victimFrame].sw_pageNo = vpnMissed;
         swapPoolTable[victimFrame].sw_pte = &(sPtr->sup_privatePgTbl[vpnMissed]);
 
-        // Update the Current Process’s Page Table entry for page p to indicate it is now present (V bit) and occupying frame i (PFN field).
-        unsigned int framePAddr = (SWAP_POOL_START_ADDR + (victimFrame * PAGESIZE)) >> ENTRYLO_PFN_BIT;
-        // 2. Salva lo stato del bit Dirty originale (0 se testo, DIRTYON se dati/stack)
+        /* Aggiorna la Page Table del processo corrente indicando che la pagina richiesta ora e' valida e che occupa il frame calcolato */
+        // Physical Frame Number (PFN) in cui e' stato caricato la pagina
+        unsigned int pfn = (SWAP_POOL_START_ADDR + (victimFrame * PAGESIZE)) >> ENTRYLO_PFN_BIT;
+        // Salva lo stato del bit Dirty originale (0 se testo, DIRTYON se dati/stack)
         unsigned int original_dirty = (sPtr->sup_privatePgTbl[vpnMissed].pte_entryLO & DIRTYON);
             
-        // 3. ASSEGNA pulendo completamente i vecchi dati e unendo i nuovi pezzi
-        sPtr->sup_privatePgTbl[vpnMissed].pte_entryLO = (framePAddr << ENTRYLO_PFN_BIT) | VALIDON | original_dirty;
+        sPtr->sup_privatePgTbl[vpnMissed].pte_entryLO = (pfn << ENTRYLO_PFN_BIT) | VALIDON | original_dirty;
 
-        // Dopo aver aggiornato la Page Table entry del processo corrente...
+        // Imposta registro EntryHi per la ricerca nel TLB
         setENTRYHI(sPtr->sup_privatePgTbl[vpnMissed].pte_entryHI);
-        setENTRYLO(sPtr->sup_privatePgTbl[vpnMissed].pte_entryLO);
 
         // Cerca se la entry è già nella TLB
         TLBP();
 
+        // Imposta registro EntryLo per la scrittura
+        setENTRYLO(sPtr->sup_privatePgTbl[vpnMissed].pte_entryLO);
+
+        // Se trovata nel TLB: sovrascrive esattamente quella riga
         if ((getINDEX() & PRESENTFLAG) == 0) {
-            // Trovata: sovrascrive esattamente quella riga
             TLBWI();
-        } else {
-            // Non trovata: inserisce in una riga casuale
+        } 
+        // Se non trovata nel TLB: inserisce in una riga casuale
+        else {
             TLBWR();
         }
 
+        // Ripristino degli interrupt
         setSTATUS(old_status);
 
+        // Rilascio semaforo per accesso Swap Pool Table
         SYSCALL(VERHOGEN, (int)&swapPoolSemaphore, 0, 0);
 
+        // Ripristina lo stato del processore
         LDST(&(sPtr->sup_exceptState[PGFAULTEXCEPT]));
     }
 }
