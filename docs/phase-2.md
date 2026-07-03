@@ -17,12 +17,12 @@ Sono state introdotte una serie di variabili condivise tra i diversi moduli dell
 | Index       | Device Class               | IntlineNo |
 | :---------- | :------------------------- | :-------- |
 | **0**       | Interval Timer             | 2         |
-| **1 – 7**   | Disk Devices               | 3         |
-| **8 – 15**  | Flash Devices              | 4         |
-| **16 – 23** | Network (Ethernet) Devices | 5         |
-| **24 – 31** | Printer Devices            | 6         |
-| **32 – 39** | Terminal Devices (TX)      | 7         |
-| **40 – 47** | Terminal Devices (RX)      | 7         |
+| **1 – 8**   | Disk Devices               | 3         |
+| **9 – 16**  | Flash Devices              | 4         |
+| **17 – 24** | Network (Ethernet) Devices | 5         |
+| **25 – 32** | Printer Devices            | 6         |
+| **33 – 40** | Terminal Devices (TX)      | 7         |
+| **41 – 48** | Terminal Devices (RX)      | 7         |
 
 `pcb_t* rootProcess`: Il primo processo che viene instanziato, il quale rappresenta la radice dell'intero albero dei processi.
 

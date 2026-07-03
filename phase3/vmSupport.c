@@ -228,8 +228,10 @@ void TLBPagerHandler() {
         swapPoolTable[victimFrame].sw_pte = &(sPtr->sup_privatePgTbl[vpnMissed]);
 
         /* Aggiorna la Page Table del processo corrente indicando che la pagina richiesta ora e' valida e che occupa il frame calcolato */
-        // Physical Frame Number (PFN) in cui e' stato caricato la pagina
-        unsigned int pfn = (SWAP_POOL_START_ADDR + (victimFrame * PAGESIZE)) >> ENTRYLO_PFN_BIT;
+        // Physical Frame Number (PFN) in cui e' stata caricata la pagina
+        // La dimensione di un frame e' 4096 (0x1000), quindi i 12 LSB rappresentano l'offset
+        // Per isolare il PFN e rimuovere l'offset, si effettua uno shift di 12 bit a destra
+        unsigned int pfn = (SWAP_POOL_START_ADDR + (victimFrame * PAGESIZE)) >> 12;
         // Salva lo stato del bit Dirty originale (0 se testo, DIRTYON se dati/stack)
         unsigned int original_dirty = (sPtr->sup_privatePgTbl[vpnMissed].pte_entryLO & DIRTYON);
             
