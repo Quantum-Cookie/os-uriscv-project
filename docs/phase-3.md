@@ -71,16 +71,7 @@ Ogni entry della tabella (`swap_t`) memorizza l'ASID del proprietario, il numero
 - `releaseFrames(asid)`: scandisce la tabella e libera tutti i frame appartenenti all'ASID indicato (usata da `SYS2 Terminate`), invalidando atomicamente anche l'eventuale entry corrispondente nella TLB.
 
 ### Pager (`TLBPagerHandler`)
-Gestisce le eccezioni TLB-Invalid (load e store, non distinte esplicitamente, semplicemete si va a vedere il dirty bit) generate dagli U-proc:
-
-1. Se la causa è una TLB-Modification (`EXC_MOD`), l'accesso è illecito (scrittura su pagina Read-Only) e viene invocato `programTrapHandler`.
-2. Altrimenti si acquisisce `swapPoolSemaphore` e si determina il VPN mancante (con l'indice 31 riservato alla pagina di stack).
-3. Si seleziona un frame vittima con `replacementAlgorithm`.
-4. Se il frame vittima è occupato, la sua Page Table entry viene invalidata e, se presente in TLB, aggiornata coerentemente; l'operazione è atomica (interrupt disabilitati) perché tocca contemporaneamente Page Table e TLB.
-5. Se il frame vittima è occupato ed è "sporco" (Dirty bit attivo), il suo contenuto viene prima scritto sul dispositivo Flash corrispondente al suo ASID.
-6. Si legge quindi dal dispositivo Flash dell'ASID corrente la pagina richiesta, caricandola nel frame selezionato.
-7. La Swap Pool Table, la Page Table del processo corrente e la TLB vengono aggiornate atomicamente (nuovo PFN, bit Valid attivo, bit Dirty preservato).
-8. Si rilascia `swapPoolSemaphore` e si ripristina l'esecuzione del processo con `LDST`.
+Gestisce le eccezioni TLB-Invalid (load e store, non distinte esplicitamente, semplicemete si va a vedere il dirty bit) generate dagli U-proc.
 
 #### Indirizzo e comando per l'I/O sul Flash
 
@@ -136,12 +127,7 @@ Entrambe le SYSCALL operano sul Terminal 0 e usano un semaforo dedicato di `supp
 - **ReadTerminal**: legge un carattere alla volta (comando `RECEIVECHAR`) finché non viene ricevuto `\n` (incluso nel conteggio), verificando ad ogni iterazione che l'indirizzo di scrittura sia ancora valido e appartenente alla stessa area logica di partenza. Restituisce il numero di caratteri ricevuti, oppure il valore negativo dello status in caso di errore.
 
 ### SYS6 Execute
-1. Valida che l'ASID richiesto (`a1`) sia compreso tra 1 e 8; in caso contrario la chiamata non ha effetto.
-2. Prepara lo stato iniziale (`state_t`) del nuovo U-proc: Stack Pointer a `USERSTACKTOP`, PC a `UPROCSTARTADDR`, Status in user mode con interrupt abilitati, tutte le interruzioni mascherabili attive e `EntryHI` impostato con il nuovo ASID.
-3. Alloca una nuova Support Structure per l'ASID tramite `allocateSupportStructure`.
-4. Crea il processo a livello di Nucleo con `SYSCALL(CREATEPROCESS, ...)`, priorità bassa.
-5. Se la creazione fallisce, la Support Structure resta inutilizzata (nessuna azione ulteriore).
-6. In caso di successo, la Shell si blocca (P su `shellSemaphore`) in attesa che l'U-proc invocato termini con `SYS2 Terminate`.
+Crea un nuovo Uproc in base all'ASID passato come argomento, dev'essere compreso tra 1 e 8. In quanto in tale progetto può essere invocato dalla Shell, si effettua una P su `shellSemaphore` in attesa che l'U-proc invocato termini con `SYS2 Terminate`.
 
 
 ### Calcolo dell'indirizzo di inizio della Swap Pool
