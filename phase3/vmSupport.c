@@ -108,7 +108,7 @@ void initSwapStructs() {
 /**
  * @brief Pager: si occupa di caricare nella Swap Pool la pagina richiesta
  * 
- * Questa funzione viene invocata quando si verifica un'eccezione di tipo TLB-Invalid
+ * La funzione viene invocata quando si verifica un'eccezione di tipo TLB-Invalid
  * (sia su operazione di lettura TLBL, sia di scrittura TLBS). Il suo compito è caricare
  * in RAM (nello Swap Pool) la pagina logica mancante recuperandola dal dispositivo Flash
  * associato all'U-proc corrente.
