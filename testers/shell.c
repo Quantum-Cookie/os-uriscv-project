@@ -19,7 +19,7 @@ int strcmp(char *str1, char *str2) {
 }
 
 void main() {
-char buffer[64];
+    char buffer[64];
 
     // Messaggio di benvenuto stampato solo all'avvio
     print(WRITETERMINAL, "--- Welcome ---\n");
@@ -36,14 +36,14 @@ char buffer[64];
             // Rimuoviamo il carattere '\n' inserendo il terminatore di stringa
             buffer[status - 1] = EOS;
 
-            // 1. Controllo per il comando speciale di uscita
+            // Controllo per il comando speciale di uscita
             if (strcmp(buffer, EXIT)) {
                 print(WRITETERMINAL, "Shell exiting. Goodbye!\n");
-                // Chiamiamo la SYS2 (Terminate Process) per chiudere la Shell stessa
+                // Chiamiamo la SYS2 (Terminate) per terminare la Shell stessa
                 SYSCALL(TERMINATE, 0, 0, 0); 
             }
             
-            // 2. Controllo dei comandi legati agli U-procs tramite i rispettivi ASID
+            // Controllo dei comandi legati agli U-procs tramite i rispettivi ASID
             else if (strcmp(buffer, "fibeight")) {
                 SYSCALL(EXECUTE, ASID_FIBEIGHT, 0, 0);
             }
@@ -69,7 +69,7 @@ char buffer[64];
                 print(WRITETERMINAL, "Available: fibeight, echo, fibeleven, uname, date, sl, calc, exit\n");
             }
             
-            // 3. Gestione comando sconosciuto
+            // Gestione comando sconosciuto
             else {
                 // Se l'utente preme solo invio (stringa vuota), non stampiamo l'errore
                 if (buffer[0] != EOS) {
