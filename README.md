@@ -52,6 +52,8 @@ In alternativa è possibile avviare l'emulatore con già la configurazione caric
 uriscv <path di config_machine.json>
 ```
 
-Una volta avviata la macchina e fatta partire l'esecuzione, per aprire la finestra del terminale principale (Terminal 0) e iniziare a digitare i comandi: 
+Una volta avviata la macchina e fatta partire l'esecuzione, per aprire la finestra del terminale principale (Terminal 0): 
 - Clicca nel menu dell'emulatore su **Windows** → **Terminal 0** 
 - La scorciatoia da tastiera <kbd>Alt</kbd> + <kbd>0</kbd>
+
+Dopo di ché è possbile iniziare a inserire i comandi. È disponibile il commando  `help` per conoscere le opzioni.
