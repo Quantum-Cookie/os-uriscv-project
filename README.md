@@ -38,6 +38,9 @@ cmake -B build
 cmake --build build
 ```
 
+### Nota
+La compilazione comprende anche i file presenti nella cartella `testers`.
+
 ## Run
 Dopo aver compilato il programma è possibile eseguirlo utilizzando emulatore specificato:
 
@@ -49,11 +52,11 @@ Caricare in seguito all'avvio il file di configurazione `config_machine.json`.
 
 In alternativa è possibile avviare l'emulatore con già la configurazione caricata:
 ```bash
-uriscv <path di config_machine.json>
+uriscv path/to/config_machine.json
 ```
 
 Una volta avviata la macchina e fatta partire l'esecuzione, per aprire la finestra del terminale principale (Terminal 0): 
 - Clicca nel menu dell'emulatore su **Windows** → **Terminal 0** 
 - La scorciatoia da tastiera <kbd>Alt</kbd> + <kbd>0</kbd>
 
-Dopo di ché è possbile iniziare a inserire i comandi. È disponibile il commando  `help` per conoscere le opzioni.
+Dopo di che è possbile iniziare a inserire i comandi. È disponibile il commando  `help` per conoscere le opzioni.
