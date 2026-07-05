@@ -214,9 +214,12 @@ static void initSupportStructure(support_t* supportStructure, int asid) {
     flash->data0 = (memaddr) uprocHeader;
     int status = SYSCALL(DOIO, (int)&(flash->command), (0 << 8) | FLASHREAD, 0);
 
+    // Se l'operazione di lettura sul Flash fallira', allora impostiamo tutte la pagine come writable
+    // Come succedeva quando non c'era tale ottimizzazione, altrimenti si puo' mettere un valore di ritorno
+    // per rappresentare l'errore
     unsigned int textPages = 0;
 
-    // Se la lettura hardware è riuscita, estraiamo subito il dato dal buffer comune
+    // Se la lettura sul Flash è riuscita, estraiamo subito il dato dal buffer comune
     if (status == READY) {
         unsigned int textMemsz = uprocHeader[AOUT_HE_TEXT_MEMSZ];
         // Sovrastima per avere il Ceil delle pagine .text
@@ -273,11 +276,18 @@ static void initShell() {
     // Alloca la Support Structure
     support_t *shellSupport = allocateSupportStructure(SHELL_ASID);
 
+    // Se allocazione per il Support Structure fallisce
+    if (!shellSupport) {
+        // La Shell non può partire
+        SYSCALL(TERMPROCESS, 0, 0, 0);
+        return;
+    }
+
     // Creazione del processo utente (Shell) tramite il Nucleo
     int shellPid = SYSCALL(CREATEPROCESS, (int)&shellState, PROCESS_PRIO_LOW, (int)shellSupport);
     // Se la creazione fallisce
     if (shellPid == -1) {
-        // Errore fatale: la Shell non può partire, arrestiamo il processo di boot
+        // La Shell non può partire
         SYSCALL(TERMPROCESS, 0, 0, 0);
         return;
     }

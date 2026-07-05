@@ -152,6 +152,12 @@ static void writeTerminal(support_t* sPtr) {
         return;
     }
 
+    // Se non c'e' nessun carattere da trasmettere
+    if (len == 0) {
+        sPtr->sup_exceptState[GENERALEXCEPT].reg_a0 = 0;
+        return;
+    }
+
     /* Controllo di validità sull'intera stringa (Inizio e Fine) */ 
     unsigned int startAddr = (unsigned int)virtAddr;
     unsigned int endAddr = (unsigned int)(virtAddr + len - 1);
@@ -291,11 +297,17 @@ static void execute(support_t* sPtr) {
     // Allocazione e inizializzazione della Support Structure 
     support_t *newSupport = allocateSupportStructure(newAsid);
 
+    // Se allocazione di una Support Structure per il nuovo Uproc e' fallito
+    if (!newSupport) {
+        return;
+    }
+
     // Lanciamo il nuovo processo tramite la CREATEPROCESS
     int pid = SYSCALL(CREATEPROCESS, (unsigned int)&newProcessState, PROCESS_PRIO_LOW, (unsigned int)newSupport);
 
     // Se la creazione del processo fallisce a livello di Nucleo
     if (pid < 0) {
+        deallocateSupportStructure(newSupport);
         return;
     }
 

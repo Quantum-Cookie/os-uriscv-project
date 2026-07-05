@@ -189,13 +189,14 @@ void TLBPagerHandler() {
 
             int wstatus = SYSCALL(DOIO, (unsigned int)&(victim_flash->command), write_cmd, 0);
             
+            // Rilascio semaforo per il dispositivo Flash
+            SYSCALL(VERHOGEN, (int)&(suppIOMutexSemaphores[victimSemIndex]), 0, 0);
+
             // Se l'operazione di scrittura era fallita invoca Program Trap
             if (wstatus != READY) {
                 SYSCALL(VERHOGEN, (int)&swapPoolSemaphore, 0, 0);
                 programTrapHandler();
             }
-
-            SYSCALL(VERHOGEN, (int)&(suppIOMutexSemaphores[victimSemIndex]), 0, 0);
         }
         
 
