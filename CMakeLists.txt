@@ -34,6 +34,7 @@ add_custom_target(
 )
 
 
+# Compila i file dentro cartella testers
 set(TESTER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/testers")
 
 add_custom_target(
