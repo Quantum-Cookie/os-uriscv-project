@@ -134,7 +134,7 @@ Crea un nuovo Uproc in base all'ASID passato come argomento, dev'essere compreso
 L'header dell'eseguibile del Sistema Operativo si trova in RAM subito dopo l'area riservata al BIOS. A partire da tale header si estraggono l'indirizzo virtuale e la dimensione del segmento `.data` (ultimo segmento del Kernel), la cui somma (`os_end`) rappresenta il limite superiore del codice occupato dal Sistema Operativo. `SWAP_POOL_START_ADDR` viene quindi ottenuto arrotondando per eccesso `os_end` all'inizio della pagina fisica successiva, così da non sovrapporsi mai al codice o ai dati del Kernel.
 
 ## Scelte implementative
-- La mappatura tra ASID e relativo dispositivo Flash è semplicemente `Flash devNo = ASID - 1` (gli ASID vanno da 1 a `UPROCMAX`, mentre i device number da 0 a `UPROCMAX - 1`).
+- La mappatura tra ASID e relativo dispositivo Flash è semplicemente `Flash devNo = ASID - 1` (gli ASID vanno da 1 a 8, mentre i device number da 0 a 7).
 
 - Le Support Structure, come i PCB in Fase 1, sono allocate staticamente (array di dimensione `UPROCMAX`) e gestite con una free list.
 
