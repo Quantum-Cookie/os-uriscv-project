@@ -38,10 +38,7 @@ set(TESTER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/testers")
 
 add_custom_target(
     CompileTesterFiles ALL
-    # Esegue 'make' spostandosi dentro la cartella tester
     COMMAND make -C ${TESTER_DIR}
     WORKING_DIRECTORY ${TESTER_DIR}
-    #COMMENT "Compilazione dei programmi U-proc tramite il Makefile esterno in ${TESTER_DIR}..."
-    # Garantisce che i tester vengano compilati solo dopo che il kernel uRISCV è pronto
     DEPENDS MultiPandOSuRISCV 
 )
