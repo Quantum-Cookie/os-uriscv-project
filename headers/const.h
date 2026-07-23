@@ -258,5 +258,7 @@
 // Numero SYSCALL Execute
 #define EXECUTE 6
 
+#define CORE_START_ADDR 0x20001000;
+
 #endif
 

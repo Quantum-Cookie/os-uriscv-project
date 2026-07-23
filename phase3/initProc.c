@@ -298,11 +298,9 @@ static void initShell() {
  * 
  */
 void initSwapPoolPosition() {
-    /* L'header dell'eseguibile si trova in RAM subito dopo la pagina riservata al BIOS.
-       In base a CORE_HDR_SIZE, l'indice corretto per saltare il blocco BIOS e il tag ID 
-       e' esattamente RAMSTART + 1024 word (ovvero CORE_HDR_SIZE - 1), in quanto comprende
-       anche id tag */
-    unsigned int *os_header = (unsigned int *)RAMSTART + CORE_HDR_SIZE - 1;
+    /* Il file .core viene caricato all'indirizzo 0x2000.1000, inoltre ha lo stesso formato 
+       di .aout */
+    unsigned int *os_header = (unsigned int *)CORE_START_ADDR;
 
     /* Estrae l'indirizzo virtuale di inizio della sezione .data e la sua dimensione complessiva.
        Essendo .data l'ultimo segmento dell'OS, delimita il confine superiore del codice del Kernel. */
