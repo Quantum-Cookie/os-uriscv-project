@@ -24,7 +24,7 @@ memaddr SWAP_POOL_START_ADDR;
 
 /* Variabili locali */ 
 // Array per mantenere tutti i Support Structure destinate ai processi utente (U-proc)
-static support_t supportStructures[8];
+static support_t supportStructures[UPROCMAX];
 
 // Buffer della dimensione di una pagina per leggere l'header aout del U-proc e configurare l'area .text come Read-Only
 static unsigned int uprocHeader[(PAGESIZE / sizeof(unsigned int))];
