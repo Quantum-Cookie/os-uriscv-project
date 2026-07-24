@@ -209,7 +209,7 @@ static void initSupportStructure(support_t* supportStructure, int asid) {
     SYSCALL(PASSEREN, (int)&(suppIOMutexSemaphores[semIndex]), 0, 0);
     SYSCALL(PASSEREN, (int)&(uprocHeaderSemaphore), 0, 0);
     
-    // Leggi la pagina 0 del flash (contiene l'header)
+    // Leggi il blocco 0 del flash (contiene l'header)
     dtpreg_t *flash = (dtpreg_t *) DEV_REG_ADDR(IL_FLASH, asid - 1);
     flash->data0 = (memaddr) uprocHeader;
     int status = SYSCALL(DOIO, (int)&(flash->command), (0 << 8) | FLASHREAD, 0);
