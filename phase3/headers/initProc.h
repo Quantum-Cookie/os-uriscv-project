@@ -7,7 +7,7 @@
  * @brief Macro per ottenere indice del rispettivo semaforo del dispositivo
  * I/O per garantire la mutua esclusione.
  * 
- * @param intExcCode Interrupt Exception Code per tale device`
+ * @param intExcCode Interrupt Exception Code per tale device
  * @param devNo Numero dispositvo 
  * @param rx Usato solo per terminal, 1 se e' receiver, 0 se e' transmitter. Tutti altri dispositivo 0
  * 
