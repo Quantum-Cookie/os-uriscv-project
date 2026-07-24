@@ -29,7 +29,7 @@ static support_t supportStructures[UPROCMAX];
 // Buffer della dimensione di una pagina per leggere l'header aout del U-proc e configurare l'area .text come Read-Only
 static unsigned int uprocHeader[(PAGESIZE / sizeof(unsigned int))];
 
-// Semaforo per mutua esclusione su tale variabile
+// Semaforo per mutua esclusione su uprocHeader
 static int uprocHeaderSemaphore = 1;
 
 // Memorizza ulltimo indirizzo della RAM
