@@ -339,4 +339,7 @@ void InstantiatorProcess() {
     /* Effettua una P sul masterSemaphore per bloccare questo processo.
        Rimarrà bloccato finche' la shell non terminera' */
     SYSCALL(PASSEREN, (unsigned int)&masterSemaphore, 0, 0);
+
+    /* Terminazione di InstantiatorProcess */
+    SYSCALL(TERMPROCESS, 0, 0, 0);
 }
