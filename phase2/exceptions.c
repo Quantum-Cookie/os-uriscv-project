@@ -29,14 +29,28 @@ static void Yield (state_t* processorState);
 
 static void passUpOrDie(state_t* processorState, unsigned int index);
 
-/*
+// Funzione che si occupa dell'evento TLB-Refill
 void uTLB_RefillHandler() {
-    setENTRYHI(0x80000000);
-    setENTRYLO(0x00000000);
+    // BIOS Data Page per il processore 0
+    state_t* processorState = GET_EXCEPTION_STATE_PTR(PROCESSOR_ID_0);
+
+    // Determina il numero di pagina (VPN) che ha causato il miss
+    unsigned int vpnMissed = ENTRYHI_GET_VPN(processorState->entry_hi);
+
+    // Se vpnMissed è lo stack (0x3FFFF) l'indice è 31, altrimenti l'indice e' gia' giusto
+    vpnMissed = vpnMissed == 0x3FFFF? 31 : vpnMissed;
+
+    // Aggiorna TLB
+    // Scrivi la entry della Page Table nei registri del TLB
+    setENTRYHI(currentProcess->p_supportStruct->sup_privatePgTbl[vpnMissed].pte_entryHI);
+    setENTRYLO(currentProcess->p_supportStruct->sup_privatePgTbl[vpnMissed].pte_entryLO);
+
+    // Inserisci l'ingresso nel TLB
     TLBWR();
-    LDST((state_t*) BIOSDATAPAGE);
+
+    // Ripristina lo stato del processore
+    LDST(processorState);
 }
-*/
 
 // Funzione handler generale delle eccezioni
 void exceptionHandler() {
@@ -374,12 +388,12 @@ static void verhogen(state_t* processorState) {
 static unsigned int mapDeviceSemaphoreByAddr(unsigned int addr) {
     /*** 
      * Index 0: intlineNo 2
-     * Index 1-7: intlineNo 3
-     * Index 8-15: intlineNo 4
-     * Index 16-23: intlineNo 5
-     * Index 24-31: intlineNo 6
-     * Index 32-39: intlineNo 7 - tx
-     * Index 40-47: intlineNo 7 - rx
+     * Index 1-8: intlineNo 3
+     * Index 9-16: intlineNo 4
+     * Index 17-24: intlineNo 5
+     * Index 25-32: intlineNo 6
+     * Index 33-40: intlineNo 7 - tx
+     * Index 41-48: intlineNo 7 - rx
      * 
      * La mappatura rispetta ordine di priorita', piu' basso e' piu' e' alto la priorita'. Indice 0 apparte per Pesudo-clock per facilitare la gestione
      * e una maggiore chiarezza nella mappatura, altrimenti basterebbe fare shift tutto di 1 e mettere index 0 per Pesudo-clock.

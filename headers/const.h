@@ -194,7 +194,7 @@
 #define USERPGTBLSIZE MAXPAGES
 #define OSFRAMES      32
 
-// #define FLASHPOOLSTART (RAMSTART + (OSFRAMES * PAGESIZE))
+#define FLASHPOOLSTART (RAMSTART + (OSFRAMES * PAGESIZE))
 #define DISKPOOLSTART  (FLASHPOOLSTART + (DEVPERINT * PAGESIZE))
 #define FRAMEPOOLSTART (DISKPOOLSTART + (DEVPERINT * PAGESIZE))
 
@@ -246,5 +246,19 @@
 
 /* Indice del semaforo utilizzato dal Pseudo-clock nell'array di semafori dedicato ai dispositivi esterni */
 #define PSEUDO_SEMAPHORE_INDEX 0
+
+
+/* phase 3 */
+// ASID della Shell
+#define SHELL_ASID 1
+
+// Numero SYSCALL ReadTerminal
+#define READTERMINAL 5
+
+// Numero SYSCALL Execute
+#define EXECUTE 6
+
+#define CORE_START_ADDR 0x20001000;
+
 #endif
 

@@ -13,9 +13,15 @@ PandOSsh è un progetto educativo pensato per comprendere il funzionamento reale
     - **Gestione Interrupt:** Gestisce gli Interrupt provenienti dai dispositivi di I/O e dai timer.
     - **Pass Up or Die:** Gestisce le chiamate alle SYSCALL no definite, i Program Trap e le eccezioni TLB.
 
+- **Fase 3:** Implementazione del **Livello di Supporto** per l'esecuzione di processi utente (*U-proc*) in spazi di indirizzamento logici isolati (Virtual Memory). I componenti principali sono:
+    - **Gestore TLB (Pager):** Gestione del page fault e implementazione della memoria virtuale.
+    - **Gestore Non-TLB:** Gestione delle eccezioni di tipo Program Trap e delle SYSCALL con valore >= 1.
+    - **Supporto I/O orientato ai caratteri:** Astrazione e gestione dei terminali per l'input/output dei processi utente
+
 ## Documentation
 - [Phase 1](./docs/phase-1.md)
 - [Phase 2](./docs/phase-2.md)
+- [Phase 3](./docs/phase-3.md)
 
 ## Requirements
 - **CMake** >= 3.25
@@ -32,8 +38,11 @@ cmake -B build
 cmake --build build
 ```
 
+### Nota
+La compilazione comprende anche i file presenti nella cartella `testers`.
+
 ## Run
-Dopo aver compilato il programma (attualmente insieme al file di test `/phase2/p2test.c`) è possibile eseguirlo utilizzando emulatore specificato:
+Dopo aver compilato il programma è possibile eseguirlo utilizzando emulatore specificato:
 
 ```bash
 uriscv
@@ -43,13 +52,11 @@ Caricare in seguito all'avvio il file di configurazione `config_machine.json`.
 
 In alternativa è possibile avviare l'emulatore con già la configurazione caricata:
 ```bash
-uriscv config_machine.json
+uriscv path/to/config_machine.json
 ```
 
-## Testing
-Attualmente il progetto è configurato per essere compilato insieme al file di test `/phase2/p2test.c`.
+Una volta avviata la macchina e fatta partire l'esecuzione, per aprire la finestra del terminale principale (Terminal 0): 
+- Clicca nel menu dell'emulatore su **Windows** → **Terminal 0** 
+- La scorciatoia da tastiera <kbd>Alt</kbd> + <kbd>0</kbd>
 
-Una volta avviata la macchina e fatta partire l'esecuzione, sul terminale dalla quale è stata avviata si dovrebbero vedere i risultati dei test.
-
-Il corretto superamento è confermato dal messaggio:
->**System halted**.
+Dopo di che è possbile iniziare a inserire i comandi. È disponibile il commando  `help` per conoscere le opzioni.

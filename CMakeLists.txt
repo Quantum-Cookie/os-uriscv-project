@@ -15,6 +15,7 @@ add_compile_options(-ffreestanding -static -nostartfiles -nostdlib -I${URISCV_IN
 include_directories(
     phase1/headers
     phase2/headers
+    phase3/headers
     headers 
 )
 
@@ -22,7 +23,7 @@ add_executable(MultiPandOS
     ./klog.c 
 	phase1/pcb.c phase1/asl.c 
 	phase2/initial.c phase2/scheduler.c phase2/exceptions.c phase2/interrupts.c phase2/utils.c 
-	phase2/p2test.c
+	phase3/initProc.c phase3/sysSupport.c phase3/vmSupport.c
     ${URISCV_SRC}/crtso.S ${URISCV_SRC}/liburiscv.S)
 
 add_custom_target(
@@ -30,4 +31,15 @@ add_custom_target(
 	COMMAND uriscv-elf2uriscv -k ${PROJECT_BINARY_DIR}/MultiPandOS
 	BYPRODUCTS MultiPandOS.core.uriscv MultiPandOS.stab.uriscv
 	DEPENDS MultiPandOS
+)
+
+
+# Compila i file dentro cartella testers
+set(TESTER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/testers")
+
+add_custom_target(
+    CompileTesterFiles ALL
+    COMMAND make -C ${TESTER_DIR}
+    WORKING_DIRECTORY ${TESTER_DIR}
+    DEPENDS MultiPandOSuRISCV 
 )
